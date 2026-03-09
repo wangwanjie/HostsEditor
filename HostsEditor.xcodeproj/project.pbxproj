@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		955DC8012F5E5C0000A34B51 /* HostsEditorHelper.bundle in Embed Helper */ = {isa = PBXBuildFile; fileRef = 955DC8002F5E5C0000A34B51 /* HostsEditorHelper.bundle */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		955DC7BD2F5E5B9900A34B51 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -21,17 +25,59 @@
 			remoteGlobalIDString = 955DC7AB2F5E5B9700A34B51;
 			remoteInfo = HostsEditor;
 		};
+		955DC8082F5E5C0000A34B51 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 955DC7A42F5E5B9700A34B51 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 955DC8032F5E5C0000A34B51;
+			remoteInfo = HostsEditorHelper;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		955DC8072F5E5C0000A34B51 /* Embed Helper */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = Contents/Library/LaunchServices;
+			dstSubfolderSpec = 1;
+			files = (
+				955DC8012F5E5C0000A34B51 /* HostsEditorHelper.bundle in Embed Helper */,
+			);
+			name = "Embed Helper";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		955DC7AC2F5E5B9700A34B51 /* HostsEditor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HostsEditor.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		955DC7BC2F5E5B9900A34B51 /* HostsEditorTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = HostsEditorTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		955DC7C62F5E5B9900A34B51 /* HostsEditorUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = HostsEditorUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		955DC8002F5E5C0000A34B51 /* HostsEditorHelper.bundle */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = HostsEditorHelper.bundle; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		955DCA442F5E66CC00A34B51 /* Exceptions for "HostsEditor" folder in "HostsEditor" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 955DC7AB2F5E5B9700A34B51 /* HostsEditor */;
+		};
+		955DCA722F5E67E100A34B51 /* Exceptions for "HostsEditorHelper" folder in "HostsEditorHelper" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 955DC8032F5E5C0000A34B51 /* HostsEditorHelper */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		955DC7AE2F5E5B9700A34B51 /* HostsEditor */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				955DCA442F5E66CC00A34B51 /* Exceptions for "HostsEditor" folder in "HostsEditor" target */,
+			);
 			path = HostsEditor;
 			sourceTree = "<group>";
 		};
@@ -43,6 +89,14 @@
 		955DC7C92F5E5B9900A34B51 /* HostsEditorUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = HostsEditorUITests;
+			sourceTree = "<group>";
+		};
+		955DC8022F5E5C0000A34B51 /* HostsEditorHelper */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				955DCA722F5E67E100A34B51 /* Exceptions for "HostsEditorHelper" folder in "HostsEditorHelper" target */,
+			);
+			path = HostsEditorHelper;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -69,6 +123,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		955DC8052F5E5C0000A34B51 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -76,6 +137,7 @@
 			isa = PBXGroup;
 			children = (
 				955DC7AE2F5E5B9700A34B51 /* HostsEditor */,
+				955DC8022F5E5C0000A34B51 /* HostsEditorHelper */,
 				955DC7BF2F5E5B9900A34B51 /* HostsEditorTests */,
 				955DC7C92F5E5B9900A34B51 /* HostsEditorUITests */,
 				955DC7AD2F5E5B9700A34B51 /* Products */,
@@ -86,6 +148,7 @@
 			isa = PBXGroup;
 			children = (
 				955DC7AC2F5E5B9700A34B51 /* HostsEditor.app */,
+				955DC8002F5E5C0000A34B51 /* HostsEditorHelper.bundle */,
 				955DC7BC2F5E5B9900A34B51 /* HostsEditorTests.xctest */,
 				955DC7C62F5E5B9900A34B51 /* HostsEditorUITests.xctest */,
 			);
@@ -102,10 +165,12 @@
 				955DC7A82F5E5B9700A34B51 /* Sources */,
 				955DC7A92F5E5B9700A34B51 /* Frameworks */,
 				955DC7AA2F5E5B9700A34B51 /* Resources */,
+				955DC8072F5E5C0000A34B51 /* Embed Helper */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				955DC8092F5E5C0000A34B51 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				955DC7AE2F5E5B9700A34B51 /* HostsEditor */,
@@ -163,6 +228,28 @@
 			productReference = 955DC7C62F5E5B9900A34B51 /* HostsEditorUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		955DC8032F5E5C0000A34B51 /* HostsEditorHelper */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 955DC80A2F5E5C0000A34B51 /* Build configuration list for PBXNativeTarget "HostsEditorHelper" */;
+			buildPhases = (
+				955DC8042F5E5C0000A34B51 /* Sources */,
+				955DC8052F5E5C0000A34B51 /* Frameworks */,
+				955DC8062F5E5C0000A34B51 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				955DC8022F5E5C0000A34B51 /* HostsEditorHelper */,
+			);
+			name = HostsEditorHelper;
+			packageProductDependencies = (
+			);
+			productName = HostsEditorHelper;
+			productReference = 955DC8002F5E5C0000A34B51 /* HostsEditorHelper.bundle */;
+			productType = "com.apple.product-type.bundle";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -201,6 +288,7 @@
 			projectRoot = "";
 			targets = (
 				955DC7AB2F5E5B9700A34B51 /* HostsEditor */,
+				955DC8032F5E5C0000A34B51 /* HostsEditorHelper */,
 				955DC7BB2F5E5B9900A34B51 /* HostsEditorTests */,
 				955DC7C52F5E5B9900A34B51 /* HostsEditorUITests */,
 			);
@@ -223,6 +311,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		955DC7C42F5E5B9900A34B51 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		955DC8062F5E5C0000A34B51 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -253,6 +348,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		955DC8042F5E5C0000A34B51 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -265,6 +367,11 @@
 			isa = PBXTargetDependency;
 			target = 955DC7AB2F5E5B9700A34B51 /* HostsEditor */;
 			targetProxy = 955DC7C72F5E5B9900A34B51 /* PBXContainerItemProxy */;
+		};
+		955DC8092F5E5C0000A34B51 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 955DC8032F5E5C0000A34B51 /* HostsEditorHelper */;
+			targetProxy = 955DC8082F5E5C0000A34B51 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -394,14 +501,15 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = HostsEditor/HostsEditor.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = X6B6C6U6QV;
-				ENABLE_APP_SANDBOX = YES;
+				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
-				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = HostsEditor/Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSMainStoryboardFile = Main;
 				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
@@ -409,10 +517,10 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.vanjay.HostsEditor;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
@@ -427,14 +535,15 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = HostsEditor/HostsEditor.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = X6B6C6U6QV;
-				ENABLE_APP_SANDBOX = YES;
+				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
-				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = HostsEditor/Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSMainStoryboardFile = Main;
 				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
@@ -442,10 +551,10 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.vanjay.HostsEditor;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
@@ -535,6 +644,44 @@
 			};
 			name = Release;
 		};
+		955DC80B2F5E5C0000A34B51 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = HostsEditorHelper/HostsEditorHelper.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = X6B6C6U6QV;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = HostsEditorHelper/Info.plist;
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = cn.vanjay.HostsEditor.Helper;
+				PRODUCT_NAME = HostsEditorHelper;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		955DC80C2F5E5C0000A34B51 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = HostsEditorHelper/HostsEditorHelper.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = X6B6C6U6QV;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = HostsEditorHelper/Info.plist;
+				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = cn.vanjay.HostsEditor.Helper;
+				PRODUCT_NAME = HostsEditorHelper;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -570,6 +717,15 @@
 			buildConfigurations = (
 				955DC7D72F5E5B9900A34B51 /* Debug */,
 				955DC7D82F5E5B9900A34B51 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		955DC80A2F5E5C0000A34B51 /* Build configuration list for PBXNativeTarget "HostsEditorHelper" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				955DC80B2F5E5C0000A34B51 /* Debug */,
+				955DC80C2F5E5C0000A34B51 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
