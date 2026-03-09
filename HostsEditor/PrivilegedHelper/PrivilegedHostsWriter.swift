@@ -10,12 +10,22 @@ import ServiceManagement
 import Security
 
 private let helperLabel = "cn.vanjay.HostsEditor.Helper"
+private let helperInstallPath = "/Library/PrivilegedHelperTools/cn.vanjay.HostsEditor.Helper"
 
-enum PrivilegedHostsError: Error {
+enum PrivilegedHostsError: Error, LocalizedError {
     case blessFailed(String)
     case connectionFailed
     case helperNotInstalled
     case timeout
+
+    var errorDescription: String? {
+        switch self {
+        case .blessFailed(let msg): return msg.isEmpty ? "安装失败（多为签名/Team ID 不匹配）" : msg
+        case .connectionFailed: return "无法连接帮助程序"
+        case .helperNotInstalled: return "帮助程序未安装"
+        case .timeout: return "连接超时"
+        }
+    }
 }
 
 final class PrivilegedHostsWriter {
@@ -26,11 +36,9 @@ final class PrivilegedHostsWriter {
 
     private init() {}
 
-    /// 检查 Helper 是否已安装并可连接
+    /// 检查 Helper 是否已安装（仅看 SMJobBless 是否已把可执行文件拷到系统目录，不依赖 XPC 连接）
     var isHelperInstalled: Bool {
-        let conn = makeConnection()
-        defer { conn?.invalidate() }
-        return conn != nil
+        FileManager.default.fileExists(atPath: helperInstallPath)
     }
 
     /// 安装 Helper（首次或更新后需管理员授权）
@@ -46,7 +54,14 @@ final class PrivilegedHostsWriter {
         let blessed = SMJobBless(kSMDomainSystemLaunchd, helperLabel as CFString, auth, &error)
         if !blessed {
             let err = error?.takeRetainedValue()
-            return PrivilegedHostsError.blessFailed((err as Error?)?.localizedDescription ?? "未知错误")
+            var msg: String
+            if let cfErr = err {
+                let desc = CFErrorCopyDescription(cfErr) as String? ?? ""
+                msg = desc.isEmpty ? "SMJobBless 失败（常见原因：签名不匹配，请确认主应用与 Helper 用同一 Team 签名）" : desc
+            } else {
+                msg = "未知错误"
+            }
+            return PrivilegedHostsError.blessFailed(msg)
         }
         return nil
     }

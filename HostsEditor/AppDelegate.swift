@@ -105,14 +105,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if let err = HostsManager.shared.installHelperIfNeeded() {
             DispatchQueue.main.async {
                 let alert = NSAlert()
-                alert.messageText = "需要安装帮助程序"
-                alert.informativeText = "编辑系统 hosts 需要管理员权限。请点击「安装」并输入密码。\n\n\(err.localizedDescription)"
+                alert.messageText = "安装帮助程序失败"
+                alert.informativeText = "\(err.localizedDescription)\n\n若已输入正确密码仍失败，多为签名问题：请在 Xcode 中确认主应用与 HostsEditorHelper 使用相同 Team，清理后重新编译。"
                 alert.alertStyle = .warning
-                alert.addButton(withTitle: "安装")
-                alert.addButton(withTitle: "稍后")
-                if alert.runModal() == .alertFirstButtonReturn {
-                    self.installHelperIfNeeded()
-                }
+                alert.addButton(withTitle: "确定")
+                alert.runModal()
             }
         }
     }
