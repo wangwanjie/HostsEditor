@@ -24,8 +24,10 @@ class ViewController: NSViewController {
     private var refreshButton: NSButton!
     private var refreshRemoteButton: NSButton!
     private var errorLabel: NSTextField!
+    private var addRemotePopover: NSPopover?
     private var remoteURLField: NSTextField!
-    private var addRemoteButton: NSButton!
+    private var addRemoteConfirmButton: NSButton!
+    private var keyMonitor: Any?
 
     /// 左侧选中项：系统（当前 hosts 全文）、默认（仅基底，不含 HostsEditor 块）、或某个方案
     private enum SidebarSelection: Equatable {
@@ -38,12 +40,57 @@ class ViewController: NSViewController {
         didSet { syncEditorFromSelection() }
     }
 
+    /// 上次同步到编辑器时的内容（即已保存到磁盘/方案的内容），用于判断是否有未保存修改
+    private var lastSyncedContent: String = ""
+
+    /// 未保存的编辑：切换方案时暂存编辑器内容，再切回来时恢复，避免误以为已保存导致保存按钮不可点
+    private var pendingEdits: [String: String] = [:]
+
     /// 防止 reloadData 触发 tableViewSelectionDidChange 时误存内容
     private var isUpdatingTable = false
 
-    private let systemRow = 0
-    private let baseRow = 1
-    private func profileRowIndex(_ index: Int) -> Int { baseRow + 1 + index }
+    private var localProfiles: [HostsProfile] { manager.profiles.filter { !$0.isRemote } }
+    private var remoteProfiles: [HostsProfile] { manager.profiles.filter { $0.isRemote } }
+
+    private let localHeaderRow = 0
+    private let systemRow = 1
+    private let baseRow = 2
+    private func localProfileRow(_ index: Int) -> Int { 3 + index }
+    private var remoteHeaderRow: Int { 3 + localProfiles.count }
+    private func remoteProfileRow(_ index: Int) -> Int { 3 + localProfiles.count + 1 + index }
+    private var totalRows: Int { 4 + localProfiles.count + remoteProfiles.count }
+
+    /// 是否为可选的配置行（非 section header）
+    private func isSelectableRow(_ row: Int) -> Bool {
+        row != localHeaderRow && row != remoteHeaderRow
+    }
+
+    /// 根据行得到选中类型
+    private func selection(forRow row: Int) -> SidebarSelection? {
+        if row == systemRow { return .system }
+        if row == baseRow { return .base }
+        if row >= localProfileRow(0), row < localProfileRow(localProfiles.count) {
+            let idx = row - 3
+            return .profile(localProfiles[idx].id)
+        }
+        if row >= remoteProfileRow(0), row < remoteProfileRow(remoteProfiles.count) {
+            let idx = row - (3 + localProfiles.count + 1)
+            return .profile(remoteProfiles[idx].id)
+        }
+        return nil
+    }
+
+    /// 根据当前 selection 得到应选中的行
+    private func row(for selection: SidebarSelection) -> Int {
+        switch selection {
+        case .system: return systemRow
+        case .base: return baseRow
+        case .profile(let id):
+            if let idx = localProfiles.firstIndex(where: { $0.id == id }) { return localProfileRow(idx) }
+            if let idx = remoteProfiles.firstIndex(where: { $0.id == id }) { return remoteProfileRow(idx) }
+            return systemRow
+        }
+    }
 
     // MARK: - Lifecycle
 
@@ -55,10 +102,33 @@ class ViewController: NSViewController {
         editorTextView.string = manager.currentSystemContent
         editorTextView.setupSyntaxHighlighting()
 
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(editorTextDidChange),
+            name: NSText.didChangeNotification,
+            object: editorTextView
+        )
+
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self else { return event }
+            if event.keyCode == 51, case .profile = self.selection {
+                if let fr = self.view.window?.firstResponder as? NSView, fr === self.editorTextView || fr.isDescendant(of: self.editorScroll) {
+                    return event
+                }
+                self.removeProfile()
+                return nil
+            }
+            return event
+        }
+
         Task { @MainActor in
             await manager.refreshSystemContent()
             syncEditorFromSelection()
         }
+    }
+
+    @objc private func editorTextDidChange(_ note: Notification) {
+        updateButtonsForSelection()
     }
 
     private var didSetSplitPosition = false
@@ -130,7 +200,7 @@ class ViewController: NSViewController {
         sidebarScroll.translatesAutoresizingMaskIntoConstraints = false
         sidebar.addSubview(sidebarScroll)
 
-        addProfileButton = NSButton(title: "新建", target: self, action: #selector(addProfile))
+        addProfileButton = NSButton(title: "新建", target: self, action: #selector(showNewProfileMenu))
         addProfileButton.bezelStyle = .rounded
         addProfileButton.translatesAutoresizingMaskIntoConstraints = false
         sidebar.addSubview(addProfileButton)
@@ -184,30 +254,16 @@ class ViewController: NSViewController {
         refreshButton.translatesAutoresizingMaskIntoConstraints = false
         right.addSubview(refreshButton)
 
+        refreshRemoteButton = NSButton(title: "刷新远程", target: self, action: #selector(refreshRemote))
+        refreshRemoteButton.bezelStyle = .rounded
+        refreshRemoteButton.translatesAutoresizingMaskIntoConstraints = false
+        right.addSubview(refreshRemoteButton)
+
         errorLabel = NSTextField(labelWithString: "")
         errorLabel.textColor = .systemRed
         errorLabel.lineBreakMode = .byTruncatingTail
         errorLabel.translatesAutoresizingMaskIntoConstraints = false
         right.addSubview(errorLabel)
-
-        let remoteLabel = NSTextField(labelWithString: "远程 URL：")
-        remoteLabel.translatesAutoresizingMaskIntoConstraints = false
-        right.addSubview(remoteLabel)
-
-        remoteURLField = NSTextField()
-        remoteURLField.placeholderString = "https://..."
-        remoteURLField.translatesAutoresizingMaskIntoConstraints = false
-        right.addSubview(remoteURLField)
-
-        addRemoteButton = NSButton(title: "添加远程方案", target: self, action: #selector(addRemote))
-        addRemoteButton.bezelStyle = .rounded
-        addRemoteButton.translatesAutoresizingMaskIntoConstraints = false
-        right.addSubview(addRemoteButton)
-
-        refreshRemoteButton = NSButton(title: "刷新远程", target: self, action: #selector(refreshRemote))
-        refreshRemoteButton.bezelStyle = .rounded
-        refreshRemoteButton.translatesAutoresizingMaskIntoConstraints = false
-        right.addSubview(refreshRemoteButton)
 
         NSLayoutConstraint.activate([
             editorScroll.topAnchor.constraint(equalTo: right.topAnchor, constant: 8),
@@ -215,21 +271,14 @@ class ViewController: NSViewController {
             editorScroll.trailingAnchor.constraint(equalTo: right.trailingAnchor, constant: -8),
             editorScroll.bottomAnchor.constraint(equalTo: applyButton.topAnchor, constant: -8),
             applyButton.leadingAnchor.constraint(equalTo: right.leadingAnchor, constant: 8),
+            applyButton.bottomAnchor.constraint(equalTo: errorLabel.topAnchor, constant: -4),
             refreshButton.leadingAnchor.constraint(equalTo: applyButton.trailingAnchor, constant: 8),
             refreshButton.centerYAnchor.constraint(equalTo: applyButton.centerYAnchor),
-            applyButton.bottomAnchor.constraint(equalTo: errorLabel.topAnchor, constant: -4),
+            refreshRemoteButton.leadingAnchor.constraint(equalTo: refreshButton.trailingAnchor, constant: 8),
+            refreshRemoteButton.centerYAnchor.constraint(equalTo: applyButton.centerYAnchor),
             errorLabel.leadingAnchor.constraint(equalTo: right.leadingAnchor, constant: 8),
             errorLabel.trailingAnchor.constraint(lessThanOrEqualTo: right.trailingAnchor, constant: -8),
-            errorLabel.bottomAnchor.constraint(equalTo: remoteLabel.topAnchor, constant: -8),
-            remoteLabel.leadingAnchor.constraint(equalTo: right.leadingAnchor, constant: 8),
-            remoteLabel.bottomAnchor.constraint(equalTo: right.bottomAnchor, constant: -8),
-            remoteURLField.leadingAnchor.constraint(equalTo: remoteLabel.trailingAnchor, constant: 8),
-            remoteURLField.centerYAnchor.constraint(equalTo: remoteLabel.centerYAnchor),
-            remoteURLField.widthAnchor.constraint(greaterThanOrEqualToConstant: 200),
-            addRemoteButton.leadingAnchor.constraint(equalTo: remoteURLField.trailingAnchor, constant: 8),
-            addRemoteButton.centerYAnchor.constraint(equalTo: remoteLabel.centerYAnchor),
-            refreshRemoteButton.leadingAnchor.constraint(equalTo: addRemoteButton.trailingAnchor, constant: 8),
-            refreshRemoteButton.centerYAnchor.constraint(equalTo: remoteLabel.centerYAnchor),
+            errorLabel.bottomAnchor.constraint(equalTo: right.bottomAnchor, constant: -8),
         ])
         return right
     }
@@ -261,18 +310,10 @@ class ViewController: NSViewController {
         isUpdatingTable = true
         let current = selection
         profileTableView.reloadData()
-        let row: Int
-        switch current {
-        case .system: row = systemRow
-        case .base: row = baseRow
-        case .profile(let id):
-            if let idx = manager.profiles.firstIndex(where: { $0.id == id }) {
-                row = profileRowIndex(idx)
-            } else {
-                row = systemRow
-            }
+        let row = row(for: current)
+        if isSelectableRow(row) {
+            profileTableView.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
         }
-        profileTableView.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
         isUpdatingTable = false
     }
 
@@ -280,14 +321,18 @@ class ViewController: NSViewController {
         switch selection {
         case .system:
             editorTextView.string = manager.currentSystemContent
-            editorTextView.isEditable = false
+            editorTextView.isEditable = true
+            lastSyncedContent = editorTextView.string
         case .base:
             editorTextView.string = manager.baseSystemContent
             editorTextView.isEditable = false
+            lastSyncedContent = editorTextView.string
         case .profile(let id):
             if let p = manager.profile(for: id) {
-                editorTextView.string = p.content
-                editorTextView.isEditable = true
+                let content = pendingEdits[id] ?? p.content
+                editorTextView.string = content
+                editorTextView.isEditable = !p.isRemote
+                lastSyncedContent = p.content
             }
         }
         editorTextView.setupSyntaxHighlighting()
@@ -295,42 +340,142 @@ class ViewController: NSViewController {
         updateButtonsForSelection()
     }
 
+    private var isContentDirty: Bool { editorTextView.string != lastSyncedContent }
+
     private func updateButtonsForSelection() {
-        let isProfile: Bool
-        if case .profile = selection { isProfile = true } else { isProfile = false }
-        applyButton.isEnabled = isProfile
-        removeProfileButton.isEnabled = isProfile
+        let canSave: Bool
+        switch selection { case .system, .profile: canSave = true; case .base: canSave = false }
+        applyButton.isEnabled = canSave && isContentDirty
+        let isDeletableProfile: Bool
+        if case .profile = selection { isDeletableProfile = true } else { isDeletableProfile = false }
+        removeProfileButton.isEnabled = isDeletableProfile
+        refreshButton.isHidden = selection != .system
+        if case .profile(let id) = selection, manager.profile(for: id)?.isRemote == true {
+            refreshRemoteButton.isHidden = false
+        } else {
+            refreshRemoteButton.isHidden = true
+        }
     }
 
     // MARK: - Actions
 
-    @objc private func addProfile() {
+    @objc private func showNewProfileMenu() {
+        let menu = NSMenu()
+        let localItem = NSMenuItem(title: "本地方案", action: #selector(addLocalProfile), keyEquivalent: "")
+        localItem.target = self
+        let remoteItem = NSMenuItem(title: "远程方案", action: #selector(showAddRemotePopover), keyEquivalent: "")
+        remoteItem.target = self
+        menu.addItem(localItem)
+        menu.addItem(remoteItem)
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: addProfileButton.bounds.height), in: addProfileButton)
+    }
+
+    @objc private func addLocalProfile() {
         let profile = HostsProfile(name: "新方案", content: "")
         manager.addProfile(profile)
-        if let idx = manager.profiles.firstIndex(where: { $0.id == profile.id }) {
-            let row = profileRowIndex(idx)
-            profileTableView.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
-            selection = .profile(profile.id)
+        selection = .profile(profile.id)
+    }
+
+    @objc private func showAddRemotePopover() {
+        let content = NSView(frame: NSRect(x: 0, y: 0, width: 340, height: 56))
+        content.wantsLayer = true
+
+        let label = NSTextField(labelWithString: "远程 URL：")
+        label.translatesAutoresizingMaskIntoConstraints = false
+        content.addSubview(label)
+
+        remoteURLField = NSTextField()
+        remoteURLField.placeholderString = "https://..."
+        remoteURLField.translatesAutoresizingMaskIntoConstraints = false
+        content.addSubview(remoteURLField)
+
+        addRemoteConfirmButton = NSButton(title: "添加", target: self, action: #selector(addRemoteFromPopover))
+        addRemoteConfirmButton.bezelStyle = .rounded
+        addRemoteConfirmButton.translatesAutoresizingMaskIntoConstraints = false
+        content.addSubview(addRemoteConfirmButton)
+
+        NSLayoutConstraint.activate([
+            label.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 12),
+            label.centerYAnchor.constraint(equalTo: content.centerYAnchor),
+            remoteURLField.leadingAnchor.constraint(equalTo: label.trailingAnchor, constant: 8),
+            remoteURLField.centerYAnchor.constraint(equalTo: content.centerYAnchor),
+            remoteURLField.widthAnchor.constraint(equalToConstant: 220),
+            addRemoteConfirmButton.leadingAnchor.constraint(equalTo: remoteURLField.trailingAnchor, constant: 8),
+            addRemoteConfirmButton.centerYAnchor.constraint(equalTo: content.centerYAnchor),
+            addRemoteConfirmButton.trailingAnchor.constraint(lessThanOrEqualTo: content.trailingAnchor, constant: -12),
+        ])
+
+        let popover = NSPopover()
+        popover.contentSize = content.frame.size
+        popover.contentViewController = NSViewController()
+        popover.contentViewController?.view = content
+        popover.behavior = .transient
+        addRemotePopover = popover
+        popover.show(relativeTo: addProfileButton.bounds, of: addProfileButton, preferredEdge: .maxY)
+        remoteURLField.window?.makeFirstResponder(remoteURLField)
+    }
+
+    @objc private func addRemoteFromPopover() {
+        let url = remoteURLField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !url.isEmpty else {
+            manager.setErrorMessage("请输入远程 URL")
+            return
+        }
+        addRemotePopover?.close()
+        addRemotePopover = nil
+        Task {
+            await manager.addRemoteProfile(urlString: url)
+            if let p = manager.profiles.first(where: { $0.remoteURL == url }) {
+                let row = row(for: .profile(p.id))
+                profileTableView.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
+                selection = .profile(p.id)
+            }
         }
     }
 
-    @objc private func removeProfile() {
-        let row = profileTableView.selectedRow
-        guard row >= profileRowIndex(0), row < profileRowIndex(manager.profiles.count) else { return }
-        let profileIndex = row - (baseRow + 1)
-        guard profileIndex >= 0, profileIndex < manager.profiles.count else { return }
-        let id = manager.profiles[profileIndex].id
+    private func performRemoveProfile() {
+        guard case .profile(let id) = selection else { return }
+        pendingEdits.removeValue(forKey: id)
         selection = .system
         Task { await manager.deleteProfile(id: id) }
     }
 
-    /// 将编辑器当前内容保存到选中方案，若方案已启用则立即写入 hosts
-    @objc private func saveAndApply() {
+    @objc private func removeProfile() {
         guard case .profile(let id) = selection else { return }
-        manager.updateProfile(id: id, content: editorTextView.string)
-        Task {
-            if manager.profile(for: id)?.isEnabled == true {
-                await manager.writeComposedHosts()
+        let name = manager.profile(for: id)?.name ?? "该方案"
+        let alert = NSAlert()
+        alert.messageText = "确定要删除「\(name)」吗？"
+        alert.informativeText = "删除后无法恢复。"
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "删除")
+        alert.addButton(withTitle: "取消")
+        if alert.runModal() == .alertFirstButtonReturn {
+            performRemoveProfile()
+        }
+    }
+
+    deinit {
+        if let m = keyMonitor { NSEvent.removeMonitor(m) }
+    }
+
+    /// 将编辑器当前内容保存：系统项直接写 hosts，方案项更新方案并视情况写入
+    @objc private func saveAndApply() {
+        switch selection {
+        case .system:
+            lastSyncedContent = editorTextView.string
+            Task { await manager.writeSystemContent(editorTextView.string) }
+            updateButtonsForSelection()
+        case .base:
+            break
+        case .profile(let id):
+            manager.updateProfile(id: id, content: editorTextView.string)
+            pendingEdits.removeValue(forKey: id)
+            lastSyncedContent = editorTextView.string
+            updateButtonsForSelection()
+            Task {
+                if manager.profile(for: id)?.isEnabled == true {
+                    await manager.writeComposedHosts()
+                }
             }
         }
     }
@@ -365,17 +510,17 @@ class ViewController: NSViewController {
         }
         Task {
             await manager.refreshRemoteProfile(id: id)
-            syncEditorFromSelection()
+            await MainActor.run {
+                pendingEdits.removeValue(forKey: id)
+                syncEditorFromSelection()
+            }
         }
     }
 
     /// 复选框点击 → 切换方案启用状态
     @objc func toggleProfileEnabled(_ sender: NSButton) {
         let row = profileTableView.row(for: sender)
-        guard row >= profileRowIndex(0), row < profileRowIndex(manager.profiles.count) else { return }
-        let profileIndex = row - (baseRow + 1)
-        guard profileIndex >= 0, profileIndex < manager.profiles.count else { return }
-        let id = manager.profiles[profileIndex].id
+        guard let sel = selection(forRow: row), case .profile(let id) = sel else { return }
         let enabled = sender.state == .on
         Task { await manager.setProfileEnabled(id: id, enabled: enabled) }
     }
@@ -386,10 +531,36 @@ class ViewController: NSViewController {
 extension ViewController: NSTableViewDataSource, NSTableViewDelegate {
 
     func numberOfRows(in tableView: NSTableView) -> Int {
-        2 + manager.profiles.count
+        totalRows
     }
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+        if row == localHeaderRow {
+            let cell = NSTableCellView()
+            let label = NSTextField(labelWithString: "本地配置")
+            label.font = NSFont.boldSystemFont(ofSize: NSFont.smallSystemFontSize)
+            label.textColor = .secondaryLabelColor
+            label.translatesAutoresizingMaskIntoConstraints = false
+            cell.addSubview(label)
+            NSLayoutConstraint.activate([
+                label.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 8),
+                label.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+            ])
+            return cell
+        }
+        if row == remoteHeaderRow {
+            let cell = NSTableCellView()
+            let label = NSTextField(labelWithString: "远程配置")
+            label.font = NSFont.boldSystemFont(ofSize: NSFont.smallSystemFontSize)
+            label.textColor = .secondaryLabelColor
+            label.translatesAutoresizingMaskIntoConstraints = false
+            cell.addSubview(label)
+            NSLayoutConstraint.activate([
+                label.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 8),
+                label.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+            ])
+            return cell
+        }
         let cellId = NSUserInterfaceItemIdentifier("ProfileCell")
         var cell = tableView.makeView(withIdentifier: cellId, owner: self) as? ProfileCellView
         if cell == nil {
@@ -403,26 +574,28 @@ extension ViewController: NSTableViewDataSource, NSTableViewDelegate {
             cell?.configureReadOnly(title: "系统")
         } else if row == baseRow {
             cell?.configureReadOnly(title: "默认")
-        } else {
-            let profileIndex = row - (baseRow + 1)
-            cell?.configure(with: manager.profiles[profileIndex])
+        } else if row >= localProfileRow(0), row < localProfileRow(localProfiles.count) {
+            let idx = row - 3
+            cell?.configure(with: localProfiles[idx])
+        } else if row >= remoteProfileRow(0), row < remoteProfileRow(remoteProfiles.count) {
+            let idx = row - (3 + localProfiles.count + 1)
+            cell?.configure(with: remoteProfiles[idx])
         }
         return cell
+    }
+
+    func tableView(_ tableView: NSTableView, shouldSelectRow row: Int) -> Bool {
+        isSelectableRow(row)
     }
 
     func tableViewSelectionDidChange(_ notification: Notification) {
         guard !isUpdatingTable else { return }
         if case .profile(let prevId) = selection {
-            manager.updateProfile(id: prevId, content: editorTextView.string)
+            pendingEdits[prevId] = editorTextView.string
         }
         let row = profileTableView.selectedRow
-        if row == systemRow {
-            selection = .system
-        } else if row == baseRow {
-            selection = .base
-        } else if row >= profileRowIndex(0), row < profileRowIndex(manager.profiles.count) {
-            let profileIndex = row - (baseRow + 1)
-            selection = .profile(manager.profiles[profileIndex].id)
+        if let sel = selection(forRow: row) {
+            selection = sel
         }
         updateButtonsForSelection()
     }

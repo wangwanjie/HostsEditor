@@ -48,7 +48,7 @@ final class ProfileCellView: NSTableCellView {
         checkbox.state = profile.isEnabled ? .on : .off
         nameField.isEditable = true
         var title = profile.name
-        if profile.isRemote { title += " ☁" }
+        if profile.isRemote, !profile.name.hasPrefix("☁️") { title += " ☁" }
         nameField.stringValue = title
     }
 

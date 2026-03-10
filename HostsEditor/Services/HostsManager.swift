@@ -93,6 +93,20 @@ final class HostsManager: ObservableObject {
         }
     }
 
+    /// 将内容直接写入系统 hosts（用于「系统」项编辑后保存）
+    func writeSystemContent(_ content: String) async {
+        do {
+            try await PrivilegedHostsWriter.shared.writeHosts(content: content)
+            currentSystemContent = content
+            let base = Self.extractBaseContent(from: content)
+            baseSystemContent = base
+            UserDefaults.standard.set(base, forKey: baseContentKey)
+            errorMessage = nil
+        } catch {
+            errorMessage = "写入系统 hosts 失败: \(error.localizedDescription)"
+        }
+    }
+
     // MARK: - Compose & Write
 
     /// 将 base 内容与所有启用方案的块组合后写入 /etc/hosts
