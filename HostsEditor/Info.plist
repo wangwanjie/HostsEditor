@@ -8,10 +8,5 @@
 	<string>Main</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
-	<key>SMPrivilegedExecutables</key>
-	<dict>
-		<key>cn.vanjay.HostsEditor.Helper</key>
-		<string>anchor apple generic and identifier "cn.vanjay.HostsEditor.Helper" and certificate leaf[subject.OU] = "$(DEVELOPMENT_TEAM)"</string>
-	</dict>
 </dict>
 </plist>

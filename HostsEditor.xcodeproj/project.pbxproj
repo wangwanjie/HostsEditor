@@ -7,7 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		955DC8012F5E5C0000A34B51 /* HostsEditorHelper.bundle in Embed Helper */ = {isa = PBXBuildFile; fileRef = 955DC8002F5E5C0000A34B51 /* HostsEditorHelper.bundle */; };
+		955DC8012F5E5C0000A34B51 /* cn.vanjay.HostsEditor.Helper in Embed Helper */ = {isa = PBXBuildFile; fileRef = 955DC8002F5E5C0000A34B51 /* cn.vanjay.HostsEditor.Helper */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		955DCA802F5E680000A34B51 /* cn.vanjay.HostsEditor.Helper.plist in Copy LaunchDaemon Plist */ = {isa = PBXBuildFile; fileRef = 955DCA7F2F5E680000A34B51 /* cn.vanjay.HostsEditor.Helper.plist */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -41,9 +42,20 @@
 			dstPath = Contents/Library/LaunchServices;
 			dstSubfolderSpec = 1;
 			files = (
-				955DC8012F5E5C0000A34B51 /* HostsEditorHelper.bundle in Embed Helper */,
+				955DC8012F5E5C0000A34B51 /* cn.vanjay.HostsEditor.Helper in Embed Helper */,
 			);
 			name = "Embed Helper";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		955DCA812F5E680100A34B51 /* Copy LaunchDaemon Plist */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "Contents/Library/LaunchDaemons";
+			dstSubfolderSpec = 1;
+			files = (
+				955DCA802F5E680000A34B51 /* cn.vanjay.HostsEditor.Helper.plist in Copy LaunchDaemon Plist */,
+			);
+			name = "Copy LaunchDaemon Plist";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
@@ -52,13 +64,15 @@
 		955DC7AC2F5E5B9700A34B51 /* HostsEditor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HostsEditor.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		955DC7BC2F5E5B9900A34B51 /* HostsEditorTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = HostsEditorTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		955DC7C62F5E5B9900A34B51 /* HostsEditorUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = HostsEditorUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		955DC8002F5E5C0000A34B51 /* HostsEditorHelper.bundle */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = HostsEditorHelper.bundle; sourceTree = BUILT_PRODUCTS_DIR; };
+		955DC8002F5E5C0000A34B51 /* cn.vanjay.HostsEditor.Helper */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = cn.vanjay.HostsEditor.Helper; sourceTree = BUILT_PRODUCTS_DIR; };
+		955DCA7F2F5E680000A34B51 /* cn.vanjay.HostsEditor.Helper.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = "cn.vanjay.HostsEditor.Helper.plist"; path = "HostsEditor/cn.vanjay.HostsEditor.Helper.plist"; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
 		955DCA442F5E66CC00A34B51 /* Exceptions for "HostsEditor" folder in "HostsEditor" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				"cn.vanjay.HostsEditor.Helper.plist",
 				Info.plist,
 			);
 			target = 955DC7AB2F5E5B9700A34B51 /* HostsEditor */;
@@ -141,6 +155,7 @@
 				955DC7BF2F5E5B9900A34B51 /* HostsEditorTests */,
 				955DC7C92F5E5B9900A34B51 /* HostsEditorUITests */,
 				955DC7AD2F5E5B9700A34B51 /* Products */,
+				955DCA822F5E680200A34B51 /* LaunchDaemons Plists */,
 			);
 			sourceTree = "<group>";
 		};
@@ -148,11 +163,19 @@
 			isa = PBXGroup;
 			children = (
 				955DC7AC2F5E5B9700A34B51 /* HostsEditor.app */,
-				955DC8002F5E5C0000A34B51 /* HostsEditorHelper.bundle */,
+				955DC8002F5E5C0000A34B51 /* cn.vanjay.HostsEditor.Helper */,
 				955DC7BC2F5E5B9900A34B51 /* HostsEditorTests.xctest */,
 				955DC7C62F5E5B9900A34B51 /* HostsEditorUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		955DCA822F5E680200A34B51 /* LaunchDaemons Plists */ = {
+			isa = PBXGroup;
+			children = (
+				955DCA7F2F5E680000A34B51 /* cn.vanjay.HostsEditor.Helper.plist */,
+			);
+			name = "LaunchDaemons Plists";
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -166,6 +189,7 @@
 				955DC7A92F5E5B9700A34B51 /* Frameworks */,
 				955DC7AA2F5E5B9700A34B51 /* Resources */,
 				955DC8072F5E5C0000A34B51 /* Embed Helper */,
+				955DCA812F5E680100A34B51 /* Copy LaunchDaemon Plist */,
 			);
 			buildRules = (
 			);
@@ -246,9 +270,9 @@
 			name = HostsEditorHelper;
 			packageProductDependencies = (
 			);
-			productName = HostsEditorHelper;
-			productReference = 955DC8002F5E5C0000A34B51 /* HostsEditorHelper.bundle */;
-			productType = "com.apple.product-type.bundle";
+			productName = cn.vanjay.HostsEditor.Helper;
+			productReference = 955DC8002F5E5C0000A34B51 /* cn.vanjay.HostsEditor.Helper */;
+			productType = "com.apple.product-type.tool";
 		};
 /* End PBXNativeTarget section */
 
@@ -517,7 +541,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.vanjay.HostsEditor;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -551,7 +575,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.vanjay.HostsEditor;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -651,12 +675,19 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = X6B6C6U6QV;
+				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = HostsEditorHelper/Info.plist;
-				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"-sectcreate",
+					__TEXT,
+					__info_plist,
+					"$(SRCROOT)/HostsEditorHelper/Info.plist",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = cn.vanjay.HostsEditor.Helper;
-				PRODUCT_NAME = HostsEditorHelper;
+				PRODUCT_NAME = cn.vanjay.HostsEditor.Helper;
 				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
@@ -670,12 +701,19 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = X6B6C6U6QV;
+				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = HostsEditorHelper/Info.plist;
-				MACOSX_DEPLOYMENT_TARGET = 11.0;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"-sectcreate",
+					__TEXT,
+					__info_plist,
+					"$(SRCROOT)/HostsEditorHelper/Info.plist",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = cn.vanjay.HostsEditor.Helper;
-				PRODUCT_NAME = HostsEditorHelper;
+				PRODUCT_NAME = cn.vanjay.HostsEditor.Helper;
 				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;

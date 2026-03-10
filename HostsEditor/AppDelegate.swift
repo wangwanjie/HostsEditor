@@ -6,6 +6,7 @@
 //
 
 import Cocoa
+import ServiceManagement
 
 @main
 class AppDelegate: NSObject, NSApplicationDelegate {
@@ -105,11 +106,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if let err = HostsManager.shared.installHelperIfNeeded() {
             DispatchQueue.main.async {
                 let alert = NSAlert()
-                alert.messageText = "安装帮助程序失败"
-                alert.informativeText = "\(err.localizedDescription)\n\n若已输入正确密码仍失败，多为签名问题：请在 Xcode 中确认主应用与 HostsEditorHelper 使用相同 Team，清理后重新编译。"
-                alert.alertStyle = .warning
-                alert.addButton(withTitle: "确定")
-                alert.runModal()
+                if (err as? PrivilegedHostsError) == .requiresApproval {
+                    alert.messageText = "需要允许后台程序"
+                    alert.informativeText = "请在「系统设置 → 通用 → 登录项与扩展程序」中允许 HostsEditor 的后台程序运行，然后重新启动应用。"
+                    alert.alertStyle = .informational
+                    alert.addButton(withTitle: "打开系统设置")
+                    alert.addButton(withTitle: "稍后")
+                    if alert.runModal() == .alertFirstButtonReturn {
+                        SMAppService.openSystemSettingsLoginItems()
+                    }
+                } else {
+                    alert.messageText = "安装帮助程序失败"
+                    alert.informativeText = err.localizedDescription
+                    alert.alertStyle = .warning
+                    alert.addButton(withTitle: "确定")
+                    alert.runModal()
+                }
             }
         }
     }

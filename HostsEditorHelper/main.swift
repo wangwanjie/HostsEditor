@@ -8,7 +8,7 @@
 import Foundation
 
 let delegate = HelperDelegate()
-let listener = NSXPCListener.service()
+let listener = NSXPCListener(machServiceName: "cn.vanjay.HostsEditor.Helper")
 listener.delegate = delegate
 listener.resume()
-exit(0)
+RunLoop.main.run()

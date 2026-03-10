@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(echo:*)",
+      "Bash(xcodebuild:*)",
+      "Bash(log show:*)",
+      "Bash(echo === 主应用 identifier ===:*)",
+      "Bash(__NEW_LINE_7907d0b6c29ff6e5__ echo \"\")",
+      "Bash(codesign -d --entitlements - \"$HELPER\")",
+      "Read(//Users/VanJay/Documents/Work/Personal/HostsEditor/**)"
+    ]
+  }
+}

@@ -18,22 +18,5 @@
 	<string>1.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
-	<key>Label</key>
-	<string>cn.vanjay.HostsEditor.Helper</string>
-	<key>MachServices</key>
-	<dict>
-		<key>cn.vanjay.HostsEditor.Helper</key>
-		<true/>
-	</dict>
-	<key>ProgramArguments</key>
-	<array>
-		<string>/Library/PrivilegedHelperTools/cn.vanjay.HostsEditor.Helper</string>
-	</array>
-	<key>RunAtLoad</key>
-	<true/>
-	<key>SMAuthorizedClients</key>
-	<array>
-		<string>anchor apple generic and identifier "cn.vanjay.HostsEditor" and certificate leaf[subject.OU] = "$(DEVELOPMENT_TEAM)"</string>
-	</array>
 </dict>
 </plist>
