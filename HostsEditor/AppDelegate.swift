@@ -151,7 +151,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let item = NSMenuItem(title: profile.name, action: #selector(applyProfileFromMenu(_:)), keyEquivalent: "")
             item.target = self
             item.representedObject = profile.id
-            item.state = HostsManager.shared.appliedProfileId == profile.id ? .on : .off
+            item.state = profile.isEnabled ? .on : .off
             statusMenu?.insertItem(item, at: insertIndex)
             profileMenuItems.append(item)
             insertIndex += 1
@@ -171,8 +171,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func applyProfileFromMenu(_ sender: NSMenuItem) {
         guard let id = sender.representedObject as? String else { return }
+        let enabled = sender.state != .on   // 切换启用状态
         Task { @MainActor in
-            await HostsManager.shared.applyProfile(id: id)
+            await HostsManager.shared.setProfileEnabled(id: id, enabled: enabled)
             rebuildProfileMenuItems()
         }
     }

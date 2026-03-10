@@ -50,7 +50,7 @@
 		955DCA812F5E680100A34B51 /* Copy LaunchDaemon Plist */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
-			dstPath = "Contents/Library/LaunchDaemons";
+			dstPath = Contents/Library/LaunchDaemons;
 			dstSubfolderSpec = 1;
 			files = (
 				955DCA802F5E680000A34B51 /* cn.vanjay.HostsEditor.Helper.plist in Copy LaunchDaemon Plist */,
@@ -65,14 +65,14 @@
 		955DC7BC2F5E5B9900A34B51 /* HostsEditorTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = HostsEditorTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		955DC7C62F5E5B9900A34B51 /* HostsEditorUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = HostsEditorUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		955DC8002F5E5C0000A34B51 /* cn.vanjay.HostsEditor.Helper */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = cn.vanjay.HostsEditor.Helper; sourceTree = BUILT_PRODUCTS_DIR; };
-		955DCA7F2F5E680000A34B51 /* cn.vanjay.HostsEditor.Helper.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = "cn.vanjay.HostsEditor.Helper.plist"; path = "HostsEditor/cn.vanjay.HostsEditor.Helper.plist"; sourceTree = SOURCE_ROOT; };
+		955DCA7F2F5E680000A34B51 /* cn.vanjay.HostsEditor.Helper.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = cn.vanjay.HostsEditor.Helper.plist; path = HostsEditor/cn.vanjay.HostsEditor.Helper.plist; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
 		955DCA442F5E66CC00A34B51 /* Exceptions for "HostsEditor" folder in "HostsEditor" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				"cn.vanjay.HostsEditor.Helper.plist",
+				cn.vanjay.HostsEditor.Helper.plist,
 				Info.plist,
 			);
 			target = 955DC7AB2F5E5B9700A34B51 /* HostsEditor */;

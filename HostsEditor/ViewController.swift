@@ -26,24 +26,24 @@ class ViewController: NSViewController {
     private var remoteURLField: NSTextField!
     private var addRemoteButton: NSButton!
 
+    /// 当前在编辑器中展示的方案 ID；nil 表示展示系统当前 hosts
     private var selectedProfileId: String? {
         didSet { syncEditorFromSelection() }
     }
+
+    /// 防止 reloadData 触发 tableViewSelectionDidChange 时误存内容
+    private var isUpdatingTable = false
+
+    // MARK: - Lifecycle
 
     override func viewDidLoad() {
         super.viewDidLoad()
         buildUI()
         setupBindings()
-        manager.$currentSystemContent
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] content in
-                guard let self = self, self.selectedProfileId == nil else { return }
-                self.editorTextView?.string = content
-            }
-            .store(in: &cancellables)
-        let placeholder = "# 正在加载系统 hosts…"
-        editorTextView.string = manager.currentSystemContent.isEmpty ? placeholder : manager.currentSystemContent
+
+        editorTextView.string = manager.currentSystemContent
         editorTextView.setupSyntaxHighlighting()
+
         Task { @MainActor in
             await manager.refreshSystemContent()
             if selectedProfileId == nil {
@@ -64,28 +64,46 @@ class ViewController: NSViewController {
 
     private func applySplitPositionIfNeeded() {
         guard !didSetSplitPosition, splitView.subviews.count >= 2, splitView.bounds.width > 300 else { return }
-        let sidebarWidth: CGFloat = 220
-        splitView.setPosition(sidebarWidth, ofDividerAt: 0)
+        splitView.setPosition(220, ofDividerAt: 0)
         didSetSplitPosition = true
     }
 
+    // MARK: - UI Build
+
     private func buildUI() {
         view.wantsLayer = true
+        splitView = NSSplitView()
+        splitView.isVertical = true
+        splitView.dividerStyle = .thin
+        splitView.translatesAutoresizingMaskIntoConstraints = false
+        splitView.delegate = self
+        splitView.addSubview(buildSidebar())
+        splitView.addSubview(buildEditorSection())
+        splitView.setHoldingPriority(.defaultLow, forSubviewAt: 0)
+        splitView.setHoldingPriority(.defaultHigh, forSubviewAt: 1)
+        view.addSubview(splitView)
+        NSLayoutConstraint.activate([
+            splitView.topAnchor.constraint(equalTo: view.topAnchor),
+            splitView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            splitView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            splitView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+        ])
+    }
 
-        // 左侧：方案列表
+    private func buildSidebar() -> NSView {
         let sidebar = NSView()
         sidebar.wantsLayer = true
-        let profileColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("Profile"))
-        profileColumn.title = "方案"
-        profileColumn.width = 180
+
+        let col = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("Profile"))
+        col.title = "方案"
+        col.width = 200
+
         profileTableView = NSTableView()
-        profileTableView.addTableColumn(profileColumn)
+        profileTableView.addTableColumn(col)
         profileTableView.headerView = nil
         profileTableView.rowHeight = 28
         profileTableView.delegate = self
         profileTableView.dataSource = self
-        profileTableView.target = self
-        profileTableView.doubleAction = #selector(onDoubleClickProfile)
         profileTableView.allowsEmptySelection = true
         profileTableView.allowsMultipleSelection = false
         profileTableView.identifier = NSUserInterfaceItemIdentifier("Profiles")
@@ -108,19 +126,6 @@ class ViewController: NSViewController {
         removeProfileButton.translatesAutoresizingMaskIntoConstraints = false
         sidebar.addSubview(removeProfileButton)
 
-        splitView = NSSplitView()
-        splitView.isVertical = true
-        splitView.dividerStyle = .thin
-        splitView.translatesAutoresizingMaskIntoConstraints = false
-        splitView.delegate = self
-
-        let editorSection = buildEditorSection()
-        splitView.addSubview(sidebar)
-        splitView.addSubview(editorSection)
-        splitView.setHoldingPriority(.defaultLow, forSubviewAt: 0)
-        splitView.setHoldingPriority(.defaultHigh, forSubviewAt: 1)
-        view.addSubview(splitView)
-
         NSLayoutConstraint.activate([
             sidebarScroll.topAnchor.constraint(equalTo: sidebar.topAnchor, constant: 8),
             sidebarScroll.leadingAnchor.constraint(equalTo: sidebar.leadingAnchor, constant: 8),
@@ -130,11 +135,8 @@ class ViewController: NSViewController {
             addProfileButton.bottomAnchor.constraint(equalTo: removeProfileButton.topAnchor, constant: -4),
             removeProfileButton.leadingAnchor.constraint(equalTo: sidebar.leadingAnchor, constant: 8),
             removeProfileButton.bottomAnchor.constraint(equalTo: sidebar.bottomAnchor, constant: -8),
-            splitView.topAnchor.constraint(equalTo: view.topAnchor),
-            splitView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            splitView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            splitView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
+        return sidebar
     }
 
     private func buildEditorSection() -> NSView {
@@ -157,7 +159,7 @@ class ViewController: NSViewController {
         editorScroll.translatesAutoresizingMaskIntoConstraints = false
         right.addSubview(editorScroll)
 
-        applyButton = NSButton(title: "应用到系统", target: self, action: #selector(applyCurrent))
+        applyButton = NSButton(title: "保存并应用", target: self, action: #selector(saveAndApply))
         applyButton.bezelStyle = .rounded
         applyButton.keyEquivalent = "\r"
         applyButton.translatesAutoresizingMaskIntoConstraints = false
@@ -208,26 +210,40 @@ class ViewController: NSViewController {
             refreshRemoteButton.leadingAnchor.constraint(equalTo: addRemoteButton.trailingAnchor, constant: 8),
             refreshRemoteButton.centerYAnchor.constraint(equalTo: remoteLabel.centerYAnchor),
         ])
-
         return right
     }
+
+    // MARK: - Bindings
 
     private func setupBindings() {
         manager.$profiles
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
-                guard let self = self else { return }
-                let currentId = self.selectedProfileId
-                self.profileTableView.reloadData()
-                if let id = currentId, let idx = self.manager.profiles.firstIndex(where: { $0.id == id }) {
-                    self.profileTableView.selectRowIndexes(IndexSet(integer: idx), byExtendingSelection: false)
-                }
+            .sink { [weak self] _ in self?.reloadTablePreservingSelection() }
+            .store(in: &cancellables)
+
+        manager.$currentSystemContent
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] content in
+                guard let self, self.selectedProfileId == nil else { return }
+                self.editorTextView.string = content
+                self.editorTextView.setupSyntaxHighlighting()
             }
             .store(in: &cancellables)
+
         manager.$errorMessage
             .receive(on: DispatchQueue.main)
             .sink { [weak self] msg in self?.errorLabel.stringValue = msg ?? "" }
             .store(in: &cancellables)
+    }
+
+    private func reloadTablePreservingSelection() {
+        isUpdatingTable = true
+        let currentId = selectedProfileId
+        profileTableView.reloadData()
+        if let id = currentId, let idx = manager.profiles.firstIndex(where: { $0.id == id }) {
+            profileTableView.selectRowIndexes(IndexSet(integer: idx), byExtendingSelection: false)
+        }
+        isUpdatingTable = false
     }
 
     private func syncEditorFromSelection() {
@@ -236,15 +252,11 @@ class ViewController: NSViewController {
         } else {
             editorTextView.string = manager.currentSystemContent
         }
+        editorTextView.setupSyntaxHighlighting()
         editorTextView.breakUndoCoalescing()
     }
 
-    @objc private func onDoubleClickProfile() {
-        let row = profileTableView.selectedRow
-        guard row >= 0, row < manager.profiles.count else { return }
-        let id = manager.profiles[row].id
-        Task { await manager.applyProfile(id: id) }
-    }
+    // MARK: - Actions
 
     @objc private func addProfile() {
         let profile = HostsProfile(name: "新方案", content: "")
@@ -259,14 +271,23 @@ class ViewController: NSViewController {
         let row = profileTableView.selectedRow
         guard row >= 0, row < manager.profiles.count else { return }
         let id = manager.profiles[row].id
-        manager.deleteProfile(id: id)
         selectedProfileId = nil
+        Task { await manager.deleteProfile(id: id) }
     }
 
-    @objc private func applyCurrent() {
-        let content = editorTextView.string
-        let id = selectedProfileId
-        Task { await manager.applyContent(content, profileId: id) }
+    /// 将编辑器当前内容保存到选中方案，若方案已启用则立即写入 hosts
+    @objc private func saveAndApply() {
+        if let id = selectedProfileId {
+            manager.updateProfile(id: id, content: editorTextView.string)
+            Task {
+                if manager.profile(for: id)?.isEnabled == true {
+                    await manager.writeComposedHosts()
+                }
+            }
+        } else {
+            // 未选中方案时，直接重新写入当前组合结果
+            Task { await manager.writeComposedHosts() }
+        }
     }
 
     @objc private func addRemote() {
@@ -286,41 +307,47 @@ class ViewController: NSViewController {
             manager.setErrorMessage("请先选择远程方案")
             return
         }
-        Task { await manager.refreshRemoteProfile(id: id) }
-        syncEditorFromSelection()
+        Task {
+            await manager.refreshRemoteProfile(id: id)
+            syncEditorFromSelection()
+        }
+    }
+
+    /// 复选框点击 → 切换方案启用状态
+    @objc func toggleProfileEnabled(_ sender: NSButton) {
+        let row = profileTableView.row(for: sender)
+        guard row >= 0, row < manager.profiles.count else { return }
+        let id = manager.profiles[row].id
+        let enabled = sender.state == .on
+        Task { await manager.setProfileEnabled(id: id, enabled: enabled) }
     }
 }
 
+// MARK: - NSTableViewDataSource, NSTableViewDelegate
+
 extension ViewController: NSTableViewDataSource, NSTableViewDelegate {
+
     func numberOfRows(in tableView: NSTableView) -> Int {
         manager.profiles.count
     }
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
-        let id = NSUserInterfaceItemIdentifier("Cell")
-        var cell = tableView.makeView(withIdentifier: id, owner: self) as? NSTableCellView
+        let cellId = NSUserInterfaceItemIdentifier("ProfileCell")
+        var cell = tableView.makeView(withIdentifier: cellId, owner: self) as? ProfileCellView
         if cell == nil {
-            cell = NSTableCellView()
-            cell?.identifier = id
-            let textField = NSTextField(labelWithString: "")
-            textField.translatesAutoresizingMaskIntoConstraints = false
-            cell?.addSubview(textField)
-            cell?.textField = textField
-            NSLayoutConstraint.activate([
-                textField.leadingAnchor.constraint(equalTo: cell!.leadingAnchor, constant: 6),
-                textField.centerYAnchor.constraint(equalTo: cell!.centerYAnchor),
-                textField.trailingAnchor.constraint(lessThanOrEqualTo: cell!.trailingAnchor, constant: -6),
-            ])
+            cell = ProfileCellView()
+            cell?.identifier = cellId
+            cell?.checkbox.target = self
+            cell?.checkbox.action = #selector(toggleProfileEnabled(_:))
+            cell?.nameField.delegate = self
         }
-        let profile = manager.profiles[row]
-        var title = profile.name
-        if profile.isRemote { title += " ☁" }
-        if manager.appliedProfileId == profile.id { title += " ✓" }
-        cell?.textField?.stringValue = title
+        cell?.configure(with: manager.profiles[row])
         return cell
     }
 
     func tableViewSelectionDidChange(_ notification: Notification) {
+        guard !isUpdatingTable else { return }
+        // 切走前把编辑器内容保存到之前的方案
         if let prevId = selectedProfileId {
             manager.updateProfile(id: prevId, content: editorTextView.string)
         }
@@ -332,6 +359,27 @@ extension ViewController: NSTableViewDataSource, NSTableViewDelegate {
         }
     }
 }
+
+// MARK: - NSTextFieldDelegate（行内改名）
+
+extension ViewController: NSTextFieldDelegate {
+
+    func controlTextDidEndEditing(_ obj: Notification) {
+        guard let field = obj.object as? NSTextField,
+              let cell = field.superview as? ProfileCellView,
+              let id = cell.profileId else { return }
+        let newName = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !newName.isEmpty else {
+            field.stringValue = manager.profile(for: id)?.name ?? ""
+            return
+        }
+        // 去掉 isRemote 附加的 ☁ 后缀再保存
+        let cleanName = newName.replacingOccurrences(of: " ☁", with: "")
+        manager.updateProfile(id: id, name: cleanName)
+    }
+}
+
+// MARK: - NSSplitViewDelegate
 
 extension ViewController: NSSplitViewDelegate {
     func splitView(_ splitView: NSSplitView, constrainMinCoordinate proposedMinimumPosition: CGFloat, ofSubviewAt index: Int) -> CGFloat {

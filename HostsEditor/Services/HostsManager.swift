@@ -13,7 +13,6 @@ final class HostsManager: ObservableObject {
 
     @Published private(set) var profiles: [HostsProfile] = []
     @Published private(set) var currentSystemContent: String = ""
-    @Published private(set) var appliedProfileId: String?
     @Published private(set) var isLoading = false
     @Published private(set) var errorMessage: String?
 
@@ -21,18 +20,21 @@ final class HostsManager: ObservableObject {
         errorMessage = message
     }
 
-    private let userDefaultsKey = "HostsEditorProfiles"
-    private let appliedProfileIdKey = "HostsEditorAppliedProfileId"
+    private let profilesKey = "HostsEditorProfiles"
+    private let baseContentKey = "HostsEditorBaseContent"
+
+    /// 系统 hosts 中不属于任何方案的原始部分
+    private(set) var baseSystemContent: String = ""
 
     private init() {
         loadProfiles()
-        loadAppliedProfileId()
+        baseSystemContent = UserDefaults.standard.string(forKey: baseContentKey) ?? ""
     }
 
     // MARK: - Persistence
 
     func loadProfiles() {
-        guard let data = UserDefaults.standard.data(forKey: userDefaultsKey),
+        guard let data = UserDefaults.standard.data(forKey: profilesKey),
               let decoded = try? JSONDecoder().decode([HostsProfile].self, from: data) else {
             profiles = [HostsProfile(name: "默认", content: "")]
             return
@@ -42,16 +44,7 @@ final class HostsManager: ObservableObject {
 
     func saveProfiles() {
         guard let data = try? JSONEncoder().encode(profiles) else { return }
-        UserDefaults.standard.set(data, forKey: userDefaultsKey)
-    }
-
-    private func loadAppliedProfileId() {
-        appliedProfileId = UserDefaults.standard.string(forKey: appliedProfileIdKey)
-    }
-
-    private func setAppliedProfileId(_ id: String?) {
-        appliedProfileId = id
-        UserDefaults.standard.set(id, forKey: appliedProfileIdKey)
+        UserDefaults.standard.set(data, forKey: profilesKey)
     }
 
     // MARK: - Profile CRUD
@@ -61,17 +54,24 @@ final class HostsManager: ObservableObject {
         saveProfiles()
     }
 
-    func updateProfile(id: String, name: String? = nil, content: String?) {
+    func updateProfile(id: String, name: String? = nil, content: String? = nil) {
         guard let idx = profiles.firstIndex(where: { $0.id == id }) else { return }
         if let name = name { profiles[idx].name = name }
         if let content = content { profiles[idx].content = content }
         saveProfiles()
     }
 
-    func deleteProfile(id: String) {
+    func deleteProfile(id: String) async {
         profiles.removeAll { $0.id == id }
-        if appliedProfileId == id { setAppliedProfileId(nil) }
         saveProfiles()
+        await writeComposedHosts()
+    }
+
+    func setProfileEnabled(id: String, enabled: Bool) async {
+        guard let idx = profiles.firstIndex(where: { $0.id == id }) else { return }
+        profiles[idx].isEnabled = enabled
+        saveProfiles()
+        await writeComposedHosts()
     }
 
     func profile(for id: String) -> HostsProfile? {
@@ -82,53 +82,89 @@ final class HostsManager: ObservableObject {
 
     func refreshSystemContent() async {
         do {
-            currentSystemContent = try await PrivilegedHostsWriter.shared.readHosts()
+            let content = try await PrivilegedHostsWriter.shared.readHosts()
+            currentSystemContent = content
+            let base = Self.extractBaseContent(from: content)
+            baseSystemContent = base
+            UserDefaults.standard.set(base, forKey: baseContentKey)
             errorMessage = nil
         } catch {
             errorMessage = "读取系统 hosts 失败: \(error.localizedDescription)"
-            currentSystemContent = """
-            # 无法读取系统 hosts
-            # 请先安装帮助程序：点击「应用到系统」时会提示输入密码安装
-            # 或确保 HostsEditorHelper 已正确安装
-            """
         }
     }
 
-    /// 将指定方案应用到系统 /etc/hosts
-    func applyProfile(id: String) async {
-        guard let profile = profile(for: id) else {
-            errorMessage = "未找到该方案"
-            return
-        }
-        await applyContent(profile.content, profileId: id)
-    }
+    // MARK: - Compose & Write
 
-    /// 将当前编辑内容应用到系统（不绑定方案 ID）
-    func applyContent(_ content: String, profileId: String? = nil) async {
+    /// 将 base 内容与所有启用方案的块组合后写入 /etc/hosts
+    func writeComposedHosts() async {
         isLoading = true
-        errorMessage = nil
         defer { isLoading = false }
-
+        let composed = composeHostsContent()
         do {
-            try await PrivilegedHostsWriter.shared.writeHosts(content: content)
-            if let id = profileId { setAppliedProfileId(id) }
-            else { setAppliedProfileId(nil) }
-            currentSystemContent = content
+            try await PrivilegedHostsWriter.shared.writeHosts(content: composed)
+            currentSystemContent = composed
+            errorMessage = nil
         } catch {
             errorMessage = "写入失败: \(error.localizedDescription)"
         }
+    }
+
+    func composeHostsContent() -> String {
+        var parts: [String] = []
+        if !baseSystemContent.isEmpty {
+            parts.append(baseSystemContent)
+        }
+        for profile in profiles where profile.isEnabled {
+            let trimmed = profile.content.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { continue }
+            parts.append(Self.blockString(for: profile))
+        }
+        return parts.joined(separator: "\n\n")
+    }
+
+    static func blockString(for profile: HostsProfile) -> String {
+        let sep = "# -------------------------------------------------------------------------------"
+        let trimmed = profile.content.trimmingCharacters(in: .newlines)
+        return [
+            "# HostsEditor:BEGIN:\(profile.id)",
+            sep,
+            "# \(profile.name) [\(profile.id)]",
+            sep,
+            trimmed,
+            "# HostsEditor:END:\(profile.id)"
+        ].joined(separator: "\n")
+    }
+
+    /// 从 hosts 内容中剥离所有由本应用管理的块，返回原始基础内容
+    static func extractBaseContent(from content: String) -> String {
+        var result = content
+        // 匹配 BEGIN…END 块（含前后空行）
+        let pattern = "\n?# HostsEditor:BEGIN:[^\\n]+\\n[\\s\\S]*?# HostsEditor:END:[^\\n]+(\\n|$)"
+        if let regex = try? NSRegularExpression(pattern: pattern) {
+            let range = NSRange(result.startIndex..., in: result)
+            result = regex.stringByReplacingMatches(in: result, range: range, withTemplate: "")
+        }
+        // 合并连续空行
+        let cleanPattern = "\\n{3,}"
+        if let regex = try? NSRegularExpression(pattern: cleanPattern) {
+            let range = NSRange(result.startIndex..., in: result)
+            result = regex.stringByReplacingMatches(in: result, range: range, withTemplate: "\n\n")
+        }
+        return result.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     // MARK: - Remote
 
     func fetchRemoteHosts(urlString: String) async -> Result<String, Error> {
         guard let url = URL(string: urlString) else {
-            return .failure(NSError(domain: "HostsEditor", code: -1, userInfo: [NSLocalizedDescriptionKey: "无效的 URL"]))
+            return .failure(NSError(domain: "HostsEditor", code: -1,
+                                    userInfo: [NSLocalizedDescriptionKey: "无效的 URL"]))
         }
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
             guard let text = String(data: data, encoding: .utf8) else {
-                return .failure(NSError(domain: "HostsEditor", code: -2, userInfo: [NSLocalizedDescriptionKey: "无法解码为 UTF-8"]))
+                return .failure(NSError(domain: "HostsEditor", code: -2,
+                                        userInfo: [NSLocalizedDescriptionKey: "无法解码为 UTF-8"]))
             }
             return .success(text)
         } catch {
@@ -142,6 +178,7 @@ final class HostsManager: ObservableObject {
             let profile = HostsProfile(
                 name: name,
                 content: content,
+                isEnabled: false,
                 isRemote: true,
                 remoteURL: urlString,
                 lastUpdated: Date()
@@ -161,6 +198,9 @@ final class HostsManager: ObservableObject {
             profiles[idx].content = content
             profiles[idx].lastUpdated = Date()
             saveProfiles()
+            if profiles[idx].isEnabled {
+                await writeComposedHosts()
+            }
             errorMessage = nil
         case .failure(let error):
             errorMessage = "刷新失败: \(error.localizedDescription)"
