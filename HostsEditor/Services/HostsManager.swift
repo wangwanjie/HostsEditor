@@ -218,10 +218,12 @@ final class HostsManager: ObservableObject {
               let url = profiles[idx].remoteURL else { return }
         switch await fetchRemoteHosts(urlString: url) {
         case .success(let content):
-            profiles[idx].content = content
-            profiles[idx].lastUpdated = Date()
+            var updated = profiles[idx]
+            updated.content = content
+            updated.lastUpdated = Date()
+            profiles[idx] = updated
             saveProfiles()
-            if profiles[idx].isEnabled {
+            if updated.isEnabled {
                 await writeComposedHosts()
             }
             errorMessage = nil
