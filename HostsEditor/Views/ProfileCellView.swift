@@ -44,9 +44,19 @@ final class ProfileCellView: NSTableCellView {
 
     func configure(with profile: HostsProfile) {
         profileId = profile.id
+        checkbox.isHidden = false
         checkbox.state = profile.isEnabled ? .on : .off
+        nameField.isEditable = true
         var title = profile.name
         if profile.isRemote { title += " ☁" }
+        nameField.stringValue = title
+    }
+
+    /// 只读项（如「系统」「默认」）：仅显示标题，无复选框、不可编辑
+    func configureReadOnly(title: String) {
+        profileId = nil
+        checkbox.isHidden = true
+        nameField.isEditable = false
         nameField.stringValue = title
     }
 }

@@ -172,7 +172,16 @@ final class HostsManager: ObservableObject {
         }
     }
 
-    func addRemoteProfile(name: String, urlString: String) async {
+    /// 从 URL 生成远程方案默认名称：☁️-文件名（去后缀）
+    static func defaultRemoteProfileName(from urlString: String) -> String {
+        guard let url = URL(string: urlString) else { return "☁️-hosts" }
+        let filename = url.lastPathComponent
+        let nameWithoutExt = (filename as NSString).deletingPathExtension
+        return nameWithoutExt.isEmpty ? "☁️-hosts" : "☁️-\(nameWithoutExt)"
+    }
+
+    func addRemoteProfile(urlString: String) async {
+        let name = Self.defaultRemoteProfileName(from: urlString)
         switch await fetchRemoteHosts(urlString: urlString) {
         case .success(let content):
             let profile = HostsProfile(

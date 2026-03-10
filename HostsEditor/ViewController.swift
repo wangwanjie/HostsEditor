@@ -21,18 +21,29 @@ class ViewController: NSViewController {
     private var addProfileButton: NSButton!
     private var removeProfileButton: NSButton!
     private var applyButton: NSButton!
+    private var refreshButton: NSButton!
     private var refreshRemoteButton: NSButton!
     private var errorLabel: NSTextField!
     private var remoteURLField: NSTextField!
     private var addRemoteButton: NSButton!
 
-    /// 当前在编辑器中展示的方案 ID；nil 表示展示系统当前 hosts
-    private var selectedProfileId: String? {
+    /// 左侧选中项：系统（当前 hosts 全文）、默认（仅基底，不含 HostsEditor 块）、或某个方案
+    private enum SidebarSelection: Equatable {
+        case system
+        case base
+        case profile(String)
+    }
+
+    private var selection: SidebarSelection = .system {
         didSet { syncEditorFromSelection() }
     }
 
     /// 防止 reloadData 触发 tableViewSelectionDidChange 时误存内容
     private var isUpdatingTable = false
+
+    private let systemRow = 0
+    private let baseRow = 1
+    private func profileRowIndex(_ index: Int) -> Int { baseRow + 1 + index }
 
     // MARK: - Lifecycle
 
@@ -46,10 +57,7 @@ class ViewController: NSViewController {
 
         Task { @MainActor in
             await manager.refreshSystemContent()
-            if selectedProfileId == nil {
-                editorTextView.string = manager.currentSystemContent
-                editorTextView.setupSyntaxHighlighting()
-            }
+            syncEditorFromSelection()
         }
     }
 
@@ -57,6 +65,12 @@ class ViewController: NSViewController {
 
     override func viewDidAppear() {
         super.viewDidAppear()
+        view.window?.minSize = NSSize(width: 800, height: 500)
+        if profileTableView.selectedRow < 0 {
+            profileTableView.selectRowIndexes(IndexSet(integer: systemRow), byExtendingSelection: false)
+            selection = .system
+            updateButtonsForSelection()
+        }
         DispatchQueue.main.async { [weak self] in
             self?.applySplitPositionIfNeeded()
         }
@@ -165,6 +179,11 @@ class ViewController: NSViewController {
         applyButton.translatesAutoresizingMaskIntoConstraints = false
         right.addSubview(applyButton)
 
+        refreshButton = NSButton(title: "刷新", target: self, action: #selector(refreshCurrentHosts))
+        refreshButton.bezelStyle = .rounded
+        refreshButton.translatesAutoresizingMaskIntoConstraints = false
+        right.addSubview(refreshButton)
+
         errorLabel = NSTextField(labelWithString: "")
         errorLabel.textColor = .systemRed
         errorLabel.lineBreakMode = .byTruncatingTail
@@ -196,6 +215,8 @@ class ViewController: NSViewController {
             editorScroll.trailingAnchor.constraint(equalTo: right.trailingAnchor, constant: -8),
             editorScroll.bottomAnchor.constraint(equalTo: applyButton.topAnchor, constant: -8),
             applyButton.leadingAnchor.constraint(equalTo: right.leadingAnchor, constant: 8),
+            refreshButton.leadingAnchor.constraint(equalTo: applyButton.trailingAnchor, constant: 8),
+            refreshButton.centerYAnchor.constraint(equalTo: applyButton.centerYAnchor),
             applyButton.bottomAnchor.constraint(equalTo: errorLabel.topAnchor, constant: -4),
             errorLabel.leadingAnchor.constraint(equalTo: right.leadingAnchor, constant: 8),
             errorLabel.trailingAnchor.constraint(lessThanOrEqualTo: right.trailingAnchor, constant: -8),
@@ -224,7 +245,7 @@ class ViewController: NSViewController {
         manager.$currentSystemContent
             .receive(on: DispatchQueue.main)
             .sink { [weak self] content in
-                guard let self, self.selectedProfileId == nil else { return }
+                guard let self, case .system = self.selection else { return }
                 self.editorTextView.string = content
                 self.editorTextView.setupSyntaxHighlighting()
             }
@@ -238,22 +259,47 @@ class ViewController: NSViewController {
 
     private func reloadTablePreservingSelection() {
         isUpdatingTable = true
-        let currentId = selectedProfileId
+        let current = selection
         profileTableView.reloadData()
-        if let id = currentId, let idx = manager.profiles.firstIndex(where: { $0.id == id }) {
-            profileTableView.selectRowIndexes(IndexSet(integer: idx), byExtendingSelection: false)
+        let row: Int
+        switch current {
+        case .system: row = systemRow
+        case .base: row = baseRow
+        case .profile(let id):
+            if let idx = manager.profiles.firstIndex(where: { $0.id == id }) {
+                row = profileRowIndex(idx)
+            } else {
+                row = systemRow
+            }
         }
+        profileTableView.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
         isUpdatingTable = false
     }
 
     private func syncEditorFromSelection() {
-        if let id = selectedProfileId, let p = manager.profile(for: id) {
-            editorTextView.string = p.content
-        } else {
+        switch selection {
+        case .system:
             editorTextView.string = manager.currentSystemContent
+            editorTextView.isEditable = false
+        case .base:
+            editorTextView.string = manager.baseSystemContent
+            editorTextView.isEditable = false
+        case .profile(let id):
+            if let p = manager.profile(for: id) {
+                editorTextView.string = p.content
+                editorTextView.isEditable = true
+            }
         }
         editorTextView.setupSyntaxHighlighting()
         editorTextView.breakUndoCoalescing()
+        updateButtonsForSelection()
+    }
+
+    private func updateButtonsForSelection() {
+        let isProfile: Bool
+        if case .profile = selection { isProfile = true } else { isProfile = false }
+        applyButton.isEnabled = isProfile
+        removeProfileButton.isEnabled = isProfile
     }
 
     // MARK: - Actions
@@ -262,31 +308,30 @@ class ViewController: NSViewController {
         let profile = HostsProfile(name: "新方案", content: "")
         manager.addProfile(profile)
         if let idx = manager.profiles.firstIndex(where: { $0.id == profile.id }) {
-            profileTableView.selectRowIndexes(IndexSet(integer: idx), byExtendingSelection: false)
-            selectedProfileId = profile.id
+            let row = profileRowIndex(idx)
+            profileTableView.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
+            selection = .profile(profile.id)
         }
     }
 
     @objc private func removeProfile() {
         let row = profileTableView.selectedRow
-        guard row >= 0, row < manager.profiles.count else { return }
-        let id = manager.profiles[row].id
-        selectedProfileId = nil
+        guard row >= profileRowIndex(0), row < profileRowIndex(manager.profiles.count) else { return }
+        let profileIndex = row - (baseRow + 1)
+        guard profileIndex >= 0, profileIndex < manager.profiles.count else { return }
+        let id = manager.profiles[profileIndex].id
+        selection = .system
         Task { await manager.deleteProfile(id: id) }
     }
 
     /// 将编辑器当前内容保存到选中方案，若方案已启用则立即写入 hosts
     @objc private func saveAndApply() {
-        if let id = selectedProfileId {
-            manager.updateProfile(id: id, content: editorTextView.string)
-            Task {
-                if manager.profile(for: id)?.isEnabled == true {
-                    await manager.writeComposedHosts()
-                }
+        guard case .profile(let id) = selection else { return }
+        manager.updateProfile(id: id, content: editorTextView.string)
+        Task {
+            if manager.profile(for: id)?.isEnabled == true {
+                await manager.writeComposedHosts()
             }
-        } else {
-            // 未选中方案时，直接重新写入当前组合结果
-            Task { await manager.writeComposedHosts() }
         }
     }
 
@@ -297,13 +342,24 @@ class ViewController: NSViewController {
             return
         }
         Task {
-            await manager.addRemoteProfile(name: "远程: \(URL(string: url)?.host ?? url)", urlString: url)
+            await manager.addRemoteProfile(urlString: url)
             remoteURLField.stringValue = ""
         }
     }
 
+    /// 刷新：重新从系统读取 hosts，并更新当前编辑器显示
+    @objc private func refreshCurrentHosts() {
+        Task { [weak self] in
+            guard let self else { return }
+            await self.manager.refreshSystemContent()
+            await MainActor.run {
+                self.syncEditorFromSelection()
+            }
+        }
+    }
+
     @objc private func refreshRemote() {
-        guard let id = selectedProfileId, manager.profile(for: id)?.isRemote == true else {
+        guard case .profile(let id) = selection, manager.profile(for: id)?.isRemote == true else {
             manager.setErrorMessage("请先选择远程方案")
             return
         }
@@ -316,8 +372,10 @@ class ViewController: NSViewController {
     /// 复选框点击 → 切换方案启用状态
     @objc func toggleProfileEnabled(_ sender: NSButton) {
         let row = profileTableView.row(for: sender)
-        guard row >= 0, row < manager.profiles.count else { return }
-        let id = manager.profiles[row].id
+        guard row >= profileRowIndex(0), row < profileRowIndex(manager.profiles.count) else { return }
+        let profileIndex = row - (baseRow + 1)
+        guard profileIndex >= 0, profileIndex < manager.profiles.count else { return }
+        let id = manager.profiles[profileIndex].id
         let enabled = sender.state == .on
         Task { await manager.setProfileEnabled(id: id, enabled: enabled) }
     }
@@ -328,7 +386,7 @@ class ViewController: NSViewController {
 extension ViewController: NSTableViewDataSource, NSTableViewDelegate {
 
     func numberOfRows(in tableView: NSTableView) -> Int {
-        manager.profiles.count
+        2 + manager.profiles.count
     }
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
@@ -341,22 +399,32 @@ extension ViewController: NSTableViewDataSource, NSTableViewDelegate {
             cell?.checkbox.action = #selector(toggleProfileEnabled(_:))
             cell?.nameField.delegate = self
         }
-        cell?.configure(with: manager.profiles[row])
+        if row == systemRow {
+            cell?.configureReadOnly(title: "系统")
+        } else if row == baseRow {
+            cell?.configureReadOnly(title: "默认")
+        } else {
+            let profileIndex = row - (baseRow + 1)
+            cell?.configure(with: manager.profiles[profileIndex])
+        }
         return cell
     }
 
     func tableViewSelectionDidChange(_ notification: Notification) {
         guard !isUpdatingTable else { return }
-        // 切走前把编辑器内容保存到之前的方案
-        if let prevId = selectedProfileId {
+        if case .profile(let prevId) = selection {
             manager.updateProfile(id: prevId, content: editorTextView.string)
         }
         let row = profileTableView.selectedRow
-        if row >= 0, row < manager.profiles.count {
-            selectedProfileId = manager.profiles[row].id
-        } else {
-            selectedProfileId = nil
+        if row == systemRow {
+            selection = .system
+        } else if row == baseRow {
+            selection = .base
+        } else if row >= profileRowIndex(0), row < profileRowIndex(manager.profiles.count) {
+            let profileIndex = row - (baseRow + 1)
+            selection = .profile(manager.profiles[profileIndex].id)
         }
+        updateButtonsForSelection()
     }
 }
 
