@@ -178,6 +178,27 @@ sudo rm -f /Library/PrivilegedHelperTools/cn.vanjay.HostsEditor.Helper
 ./scripts/build_dmg.sh --keychain-profile <your-profile>
 ```
 
+如需把生成好的 DMG 上传到 GitHub Releases，可执行：
+
+```bash
+./scripts/publish_github_release.sh
+```
+
+说明：
+
+- 默认上传 `build/dmg/` 下最新的 `HostsEditor_V_*.dmg`
+- 默认优先从 `origin_github` remote 推断 GitHub 仓库，也可通过 `--repo OWNER/REPO` 显式指定
+- 默认使用 `v<版本号>` 作为 tag，使用 `HostsEditor v<版本号>` 作为 release 标题
+- 如果对应 tag 的 release 已存在，会覆盖上传同名 DMG 资源
+- 依赖 `gh` CLI，使用前需要先执行 `gh auth login`
+
+示例：
+
+```bash
+./scripts/publish_github_release.sh --generate-notes
+./scripts/publish_github_release.sh --repo wangwanjie/HostsEditor --tag v1.0
+```
+
 ## 项目结构
 
 ```text
@@ -190,7 +211,8 @@ HostsEditor/
 ├── HostsEditorHelper/            # 特权 Helper，可读写 /etc/hosts
 ├── HostsEditorTests/             # 单元测试目标
 ├── HostsEditorUITests/           # UI 测试目标
-└── scripts/build_dmg.sh          # DMG 打包脚本
+├── scripts/build_dmg.sh          # DMG 打包脚本
+└── scripts/publish_github_release.sh # GitHub Releases 上传脚本
 ```
 
 ## 技术栈
