@@ -75,6 +75,71 @@ resign_for_notarization() {
         "$APP_PATH"
 }
 
+create_pretty_dmg() {
+    local app_path="$1"
+    local dmg_path="$2"
+    local volume_name="$3"
+    local work_dir="$BUILD_DIR/dmg-tmp"
+    local staging_dir="$work_dir/staging"
+    local rw_dmg_path="$work_dir/${volume_name}.temp.dmg"
+    local app_name
+    local device
+    local attach_output
+    local mounted_volume_path
+    local mounted_volume_name
+
+    app_name="$(basename "$app_path")"
+
+    rm -rf "$work_dir"
+    mkdir -p "$staging_dir"
+    cp -R "$app_path" "$staging_dir/"
+    ln -s /Applications "$staging_dir/Applications"
+
+    hdiutil create -volname "$volume_name" \
+        -srcfolder "$staging_dir" \
+        -ov -format UDRW \
+        "$rw_dmg_path"
+
+    attach_output="$(hdiutil attach -readwrite -noverify -noautoopen "$rw_dmg_path")"
+    device="$(printf '%s\n' "$attach_output" | awk -F '\t' '/\/Volumes\// {print $1; exit}')"
+    mounted_volume_path="$(printf '%s\n' "$attach_output" | awk -F '\t' '/\/Volumes\// {print $NF; exit}')"
+    mounted_volume_name="$(basename "$mounted_volume_path")"
+
+    if [[ -z "$device" || -z "$mounted_volume_name" ]]; then
+        echo "错误: 无法挂载临时 DMG" >&2
+        echo "$attach_output" >&2
+        exit 1
+    fi
+
+    # 用 Finder 写入 .DS_Store，控制窗口尺寸和图标位置。
+    osascript <<EOF
+tell application "Finder"
+    tell disk "$mounted_volume_name"
+        open
+        set current view of container window to icon view
+        set toolbar visible of container window to false
+        set statusbar visible of container window to false
+        set bounds of container window to {200, 160, 740, 460}
+        set viewOptions to the icon view options of container window
+        set arrangement of viewOptions to not arranged
+        set icon size of viewOptions to 128
+        set position of item "$app_name" of container window to {150, 170}
+        set position of item "Applications" of container window to {390, 170}
+        close
+        open
+        update without registering applications
+        delay 2
+    end tell
+end tell
+EOF
+
+    sync
+    sleep 1
+    hdiutil detach "$mounted_volume_path" || hdiutil detach "$device" -force
+    hdiutil convert "$rw_dmg_path" -format UDZO -imagekey zlib-level=9 -o "$dmg_path"
+    rm -rf "$work_dir"
+}
+
 # 解析参数
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -154,12 +219,9 @@ VOLUME_NAME="HostsEditor V$VERSION"
 # 若已存在同名 DMG 先删除，避免 hdiutil 报错
 rm -f "$DMG_PATH"
 
-# 创建 DMG（只读、压缩）
+# 创建 DMG（包含 Applications 快捷方式和预设窗口布局）
 echo "生成 DMG: $DMG_PATH"
-hdiutil create -volname "$VOLUME_NAME" \
-    -srcfolder "$APP_PATH" \
-    -ov -format UDZO \
-    "$DMG_PATH"
+create_pretty_dmg "$APP_PATH" "$DMG_PATH" "$VOLUME_NAME"
 
 echo "DMG 已生成: $DMG_PATH"
 
