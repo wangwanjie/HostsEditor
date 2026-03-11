@@ -17,6 +17,63 @@ DERIVED_DATA="$BUILD_DIR/DerivedData"
 DMG_OUTPUT_DIR="$BUILD_DIR/dmg"
 KEYCHAIN_PROFILE="vanjay_mac_stapler"
 DO_NOTARIZE=true
+APP_ENTITLEMENTS="$PROJECT_DIR/HostsEditor/HostsEditor-Release.entitlements"
+HELPER_ENTITLEMENTS="$PROJECT_DIR/HostsEditorHelper/HostsEditorHelper-Release.entitlements"
+
+verify_signature() {
+    local target_path="$1"
+    local target_name="$2"
+    local sign_info
+
+    echo "校验签名: $target_name"
+    sign_info="$(codesign -dv --verbose=4 "$target_path" 2>&1)"
+
+    if ! grep -q "Authority=Developer ID Application" <<<"$sign_info"; then
+        echo "错误: $target_name 未使用 Developer ID Application 签名" >&2
+        echo "$sign_info" >&2
+        exit 1
+    fi
+
+    if ! grep -q "Timestamp=" <<<"$sign_info"; then
+        echo "错误: $target_name 签名缺少 secure timestamp" >&2
+        echo "$sign_info" >&2
+        exit 1
+    fi
+}
+
+current_signing_authority() {
+    local target_path="$1"
+    codesign -dv --verbose=4 "$target_path" 2>&1 | sed -n 's/^Authority=\(Developer ID Application:.*\)$/\1/p' | head -1
+}
+
+resign_macho_file() {
+    local target_path="$1"
+    local identity="$2"
+    /usr/bin/codesign --force --sign "$identity" --timestamp --options runtime "$target_path"
+}
+
+resign_for_notarization() {
+    local identity="$1"
+    local frameworks_dir="$APP_PATH/Contents/Frameworks"
+
+    echo "重新签名发布产物并补充 secure timestamp..."
+
+    if [[ -d "$frameworks_dir" ]]; then
+        while IFS= read -r -d '' file_path; do
+            if file "$file_path" | grep -q "Mach-O"; then
+                resign_macho_file "$file_path" "$identity"
+            fi
+        done < <(find "$frameworks_dir" -type f -print0)
+    fi
+
+    /usr/bin/codesign --force --sign "$identity" --timestamp --options runtime \
+        --entitlements "$HELPER_ENTITLEMENTS" \
+        "$HELPER_PATH"
+
+    /usr/bin/codesign --force --sign "$identity" --timestamp --options runtime \
+        --entitlements "$APP_ENTITLEMENTS" \
+        "$APP_PATH"
+}
 
 # 解析参数
 while [[ $# -gt 0 ]]; do
@@ -63,18 +120,31 @@ echo "版本号: $VERSION"
 DMG_NAME="HostsEditor_V_${VERSION}.dmg"
 APP_PATH="$DERIVED_DATA/Build/Products/$CONFIGURATION/HostsEditor.app"
 
-# 构建（arm64 + x86_64，通用 Mac；Release 在工程内已配置为 Manual + Developer ID）
+# 构建（arm64 + x86_64，Release 需使用 Developer ID Application 签名）
 echo "构建 $SCHEME (Release, arm64 + x86_64)..."
 xcodebuild -scheme "$SCHEME" \
     -configuration "$CONFIGURATION" \
     -derivedDataPath "$DERIVED_DATA" \
+    -destination "generic/platform=macOS" \
     ARCHS="arm64 x86_64" \
+    ONLY_ACTIVE_ARCH=NO \
     clean build
 
 if [[ ! -d "$APP_PATH" ]]; then
     echo "错误: 未找到构建产物 $APP_PATH" >&2
     exit 1
 fi
+
+HELPER_PATH="$APP_PATH/Contents/Library/LaunchServices/cn.vanjay.HostsEditor.Helper"
+SIGNING_AUTHORITY="$(current_signing_authority "$APP_PATH")"
+if [[ -z "$SIGNING_AUTHORITY" ]]; then
+    echo "错误: 未能从构建产物识别 Developer ID Application 签名身份" >&2
+    exit 1
+fi
+
+resign_for_notarization "$SIGNING_AUTHORITY"
+verify_signature "$APP_PATH" "HostsEditor.app"
+verify_signature "$HELPER_PATH" "cn.vanjay.HostsEditor.Helper"
 
 # 准备 DMG 输出目录
 mkdir -p "$DMG_OUTPUT_DIR"
