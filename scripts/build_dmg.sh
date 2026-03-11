@@ -216,6 +216,7 @@ create_pretty_dmg() {
     rm -rf "$work_dir"
     mkdir -p "$staging_dir" "$background_dir"
     cp -R "$app_path" "$staging_dir/"
+    ln -s /Applications "$staging_dir/Applications"
     generate_dmg_background "$background_path"
     chflags hidden "$background_dir" 2>/dev/null || true
 
@@ -237,12 +238,6 @@ create_pretty_dmg() {
         exit 1
     fi
 
-    osascript <<EOF
-tell application "Finder"
-    make new alias file at POSIX file "$mounted_volume_path" to POSIX file "/Applications" with properties {name:"Applications"}
-end tell
-EOF
-
     # 用 Finder 写入 .DS_Store，控制窗口尺寸、背景图和图标位置。
     osascript <<EOF
 tell application "Finder"
@@ -254,12 +249,12 @@ tell application "Finder"
         set bounds of container window to {220, 120, 840, 520}
         set viewOptions to the icon view options of container window
         set arrangement of viewOptions to not arranged
-        set icon size of viewOptions to 104
-        set text size of viewOptions to 14
+        set icon size of viewOptions to 96
+        set text size of viewOptions to 13
         set background picture of viewOptions to file ".background:installer-background.png"
         set position of every item of container window to {760, 40}
-        set position of item "$app_name" of container window to {154, 188}
-        set position of item "Applications" of container window to {466, 188}
+        set position of item "$app_name" of container window to {154, 180}
+        set position of item "Applications" of container window to {466, 180}
         close
         open
         update without registering applications
