@@ -106,20 +106,6 @@ drawText(
     color: NSColor(calibratedRed: 0.26, green: 0.34, blue: 0.45, alpha: 1)
 )
 
-drawText(
-    "HostsEditor.app",
-    rect: NSRect(x: 68, y: 84, width: 172, height: 20),
-    font: NSFont(name: "Avenir Next Medium", size: 15) ?? .systemFont(ofSize: 15, weight: .medium),
-    color: NSColor(calibratedRed: 0.24, green: 0.30, blue: 0.38, alpha: 1)
-)
-
-drawText(
-    "Applications",
-    rect: NSRect(x: 382, y: 84, width: 168, height: 20),
-    font: NSFont(name: "Avenir Next Medium", size: 15) ?? .systemFont(ofSize: 15, weight: .medium),
-    color: NSColor(calibratedRed: 0.24, green: 0.30, blue: 0.38, alpha: 1)
-)
-
 let badge = NSBezierPath(roundedRect: NSRect(x: 230, y: 128, width: 54, height: 54), xRadius: 27, yRadius: 27)
 NSColor(calibratedRed: 0.90, green: 0.95, blue: 1.0, alpha: 1).setFill()
 badge.fill()
