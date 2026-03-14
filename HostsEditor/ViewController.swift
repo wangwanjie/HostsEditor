@@ -28,6 +28,7 @@ class ViewController: NSViewController {
     private static let mainWindowFrameAutosaveName = NSWindow.FrameAutosaveName("HostsEditorMainWindowFrame")
 
     private let manager = HostsManager.shared
+    private let settings = AppSettings.shared
     private var cancellables = Set<AnyCancellable>()
 
     private var splitView: NSSplitView!
@@ -263,7 +264,7 @@ class ViewController: NSViewController {
         editorTextView = HostsEditorTextView()
         editorTextView.isEditable = true
         editorTextView.isRichText = false
-        editorTextView.font = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
+        editorTextView.applyEditorFontSize(CGFloat(settings.editorFontSize))
         editorTextView.allowsUndo = true
         editorTextView.minSize = NSSize(width: 200, height: 200)
 
@@ -343,6 +344,13 @@ class ViewController: NSViewController {
         manager.$isLoading
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.updateButtonsForSelection() }
+            .store(in: &cancellables)
+
+        settings.$editorFontSize
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] pointSize in
+                self?.editorTextView.applyEditorFontSize(CGFloat(pointSize))
+            }
             .store(in: &cancellables)
     }
 

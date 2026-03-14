@@ -4,6 +4,7 @@
 //
 
 import AppKit
+import Combine
 import Foundation
 
 #if canImport(Sparkle)
@@ -14,12 +15,12 @@ struct ReleaseVersion: Comparable {
     let rawValue: String
     private let components: [Int]
 
-    init(_ rawValue: String) {
+    nonisolated init(_ rawValue: String) {
         self.rawValue = rawValue
         self.components = Self.parse(rawValue)
     }
 
-    static func < (lhs: ReleaseVersion, rhs: ReleaseVersion) -> Bool {
+    nonisolated static func < (lhs: ReleaseVersion, rhs: ReleaseVersion) -> Bool {
         let maxCount = max(lhs.components.count, rhs.components.count)
         for index in 0..<maxCount {
             let left = index < lhs.components.count ? lhs.components[index] : 0
@@ -31,10 +32,18 @@ struct ReleaseVersion: Comparable {
         return false
     }
 
-    private static func parse(_ rawValue: String) -> [Int] {
+    nonisolated static func == (lhs: ReleaseVersion, rhs: ReleaseVersion) -> Bool {
+        lhs.components == rhs.components
+    }
+
+    nonisolated private static func parse(_ rawValue: String) -> [Int] {
         var sanitized = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
         if sanitized.hasPrefix("v") || sanitized.hasPrefix("V") {
             sanitized.removeFirst()
+        }
+
+        if let suffixIndex = sanitized.firstIndex(where: { $0 == "-" || $0 == "+" }) {
+            sanitized = String(sanitized[..<suffixIndex])
         }
 
         let values = sanitized
@@ -51,6 +60,8 @@ final class UpdateManager: NSObject {
     static let shared = UpdateManager()
 
     private let lastUpdateCheckKey = "HostsEditorLastUpdateCheckDate"
+    private let settings = AppSettings.shared
+    private var cancellables = Set<AnyCancellable>()
 
     #if canImport(Sparkle)
     private var sparkleUpdaterController: SPUStandardUpdaterController?
@@ -59,6 +70,7 @@ final class UpdateManager: NSObject {
     private override init() {}
 
     func configure() {
+        observeSettingsIfNeeded()
         #if canImport(Sparkle)
         guard sparkleUpdaterController == nil, isSparkleConfigured else { return }
         sparkleUpdaterController = SPUStandardUpdaterController(
@@ -66,20 +78,33 @@ final class UpdateManager: NSObject {
             updaterDelegate: nil,
             userDriverDelegate: nil
         )
+        applySparkleSettings()
         #endif
     }
 
     func scheduleBackgroundUpdateCheck() {
-        #if canImport(Sparkle)
-        if sparkleUpdaterController != nil {
+        switch settings.updateCheckStrategy {
+        case .manual:
             return
-        }
-        #endif
+        case .daily:
+            #if canImport(Sparkle)
+            if sparkleUpdaterController != nil {
+                return
+            }
+            #endif
 
-        let interval: TimeInterval = 24 * 60 * 60
-        if let lastCheck = UserDefaults.standard.object(forKey: lastUpdateCheckKey) as? Date,
-           Date().timeIntervalSince(lastCheck) < interval {
-            return
+            let interval: TimeInterval = 24 * 60 * 60
+            if let lastCheck = UserDefaults.standard.object(forKey: lastUpdateCheckKey) as? Date,
+               Date().timeIntervalSince(lastCheck) < interval {
+                return
+            }
+        case .onLaunch:
+            #if canImport(Sparkle)
+            if let sparkleUpdaterController {
+                sparkleUpdaterController.updater.checkForUpdatesInBackground()
+                return
+            }
+            #endif
         }
 
         Task { [weak self] in
@@ -105,6 +130,30 @@ final class UpdateManager: NSObject {
         NSWorkspace.shared.open(url)
     }
 
+    var supportsAutomaticUpdateDownloads: Bool {
+        #if canImport(Sparkle)
+        guard let updater = sparkleUpdaterController?.updater else { return false }
+        return updater.allowsAutomaticUpdates
+        #else
+        return false
+        #endif
+    }
+
+    var automaticallyDownloadsUpdates: Bool {
+        get {
+            #if canImport(Sparkle)
+            return sparkleUpdaterController?.updater.automaticallyDownloadsUpdates ?? false
+            #else
+            return false
+            #endif
+        }
+        set {
+            #if canImport(Sparkle)
+            sparkleUpdaterController?.updater.automaticallyDownloadsUpdates = newValue
+            #endif
+        }
+    }
+
     private var repositoryURL: URL? {
         guard let raw = Bundle.main.object(forInfoDictionaryKey: "HostsEditorGitHubURL") as? String else { return nil }
         return URL(string: raw)
@@ -121,7 +170,34 @@ final class UpdateManager: NSObject {
         let publicKey = (Bundle.main.object(forInfoDictionaryKey: "SUPublicEDKey") as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         return !feedURL.isEmpty && !publicKey.isEmpty
     }
+
+    private func applySparkleSettings() {
+        guard let updater = sparkleUpdaterController?.updater else { return }
+
+        switch settings.updateCheckStrategy {
+        case .manual:
+            updater.automaticallyChecksForUpdates = false
+        case .daily:
+            updater.updateCheckInterval = 24 * 60 * 60
+            updater.automaticallyChecksForUpdates = true
+        case .onLaunch:
+            updater.automaticallyChecksForUpdates = false
+        }
+    }
     #endif
+
+    private func observeSettingsIfNeeded() {
+        guard cancellables.isEmpty else { return }
+
+        settings.$updateCheckStrategy
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                #if canImport(Sparkle)
+                self?.applySparkleSettings()
+                #endif
+            }
+            .store(in: &cancellables)
+    }
 
     private func checkGitHubLatestRelease(interactive: Bool) async {
         guard let latestReleaseAPIURL else {

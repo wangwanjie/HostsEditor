@@ -9,6 +9,17 @@ final class HostsEditorTextView: NSTextView {
     private let highlighter = HostsSyntaxHighlighter()
     private var didAttachHighlighter = false
 
+    func applyEditorFontSize(_ pointSize: CGFloat) {
+        let font = NSFont.monospacedSystemFont(ofSize: pointSize, weight: .regular)
+        self.font = font
+        typingAttributes[.font] = font
+
+        guard let storage = textStorage, storage.length > 0 else { return }
+        storage.beginEditing()
+        storage.addAttribute(.font, value: font, range: NSRange(location: 0, length: storage.length))
+        storage.endEditing()
+    }
+
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         attachHighlighterIfNeeded()

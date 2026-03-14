@@ -14,6 +14,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var statusMenu: NSMenu?
     private var profileMenuItems: [NSMenuItem] = []
+    private let preferencesWindowController = PreferencesWindowController.shared
     private var isPresentingHelperInterventionAlert = false
     private var shouldRetryPendingOperationAfterActivation = false
 
@@ -43,7 +44,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         checkForUpdatesItem.target = self
         appMenu.addItem(checkForUpdatesItem)
         appMenu.addItem(NSMenuItem.separator())
-        appMenu.addItem(NSMenuItem(title: "偏好设置…", action: nil, keyEquivalent: ","))
+        let preferencesItem = NSMenuItem(title: "偏好设置…", action: #selector(openPreferencesWindow), keyEquivalent: ",")
+        preferencesItem.target = self
+        appMenu.addItem(preferencesItem)
         appMenu.addItem(NSMenuItem.separator())
         let servicesItem = NSMenuItem(title: "服务", action: nil, keyEquivalent: "")
         let servicesMenu = NSMenu()
@@ -334,6 +337,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func checkForUpdates() {
         UpdateManager.shared.checkForUpdates()
+    }
+
+    @objc private func openPreferencesWindow() {
+        preferencesWindowController.showPreferencesWindow()
     }
 
     @objc private func openGitHubHomepage() {
