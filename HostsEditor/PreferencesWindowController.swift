@@ -5,6 +5,7 @@
 
 import AppKit
 import Combine
+import SnapKit
 
 @MainActor
 final class PreferencesWindowController: NSWindowController {
@@ -20,7 +21,8 @@ final class PreferencesWindowController: NSWindowController {
         window.toolbarStyle = .preference
         window.isReleasedWhenClosed = false
         window.tabbingMode = .disallowed
-        window.setContentSize(NSSize(width: 520, height: 300))
+        window.setContentSize(NSSize(width: 560, height: 320))
+        window.minSize = NSSize(width: 560, height: 320)
         window.center()
         super.init(window: window)
         shouldCascadeWindows = false
@@ -45,9 +47,27 @@ final class PreferencesWindowController: NSWindowController {
 
 @MainActor
 private final class PreferencesViewController: NSViewController {
+    private enum PreferencesSection: Int, CaseIterable {
+        case updates
+        case editor
+
+        var title: String {
+            switch self {
+            case .updates:
+                return "更新"
+            case .editor:
+                return "编辑器"
+            }
+        }
+    }
+
     private let settings = AppSettings.shared
     private var cancellables = Set<AnyCancellable>()
+    private var currentSection: PreferencesSection = .updates
 
+    private var sectionControl: NSSegmentedControl!
+    private var updatesSectionView: NSView!
+    private var editorSectionView: NSView!
     private var updateStrategyPopup: NSPopUpButton!
     private var automaticDownloadsCheckbox: NSButton!
     private var automaticDownloadsHintLabel: NSTextField!
@@ -57,7 +77,6 @@ private final class PreferencesViewController: NSViewController {
 
     override func loadView() {
         view = NSView()
-        view.translatesAutoresizingMaskIntoConstraints = false
         buildUI()
     }
 
@@ -65,46 +84,52 @@ private final class PreferencesViewController: NSViewController {
         super.viewDidLoad()
         bindSettings()
         syncControlsFromSettings()
+        syncVisibleSection()
     }
 
     private func buildUI() {
-        let rootStack = NSStackView()
-        rootStack.orientation = .vertical
-        rootStack.alignment = .leading
-        rootStack.spacing = 18
-        rootStack.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(rootStack)
+        sectionControl = NSSegmentedControl(
+            labels: PreferencesSection.allCases.map(\.title),
+            trackingMode: .selectOne,
+            target: self,
+            action: #selector(sectionChanged(_:))
+        )
+        sectionControl.selectedSegment = currentSection.rawValue
 
-        let updatesSection = NSStackView(views: [
-            makeSectionTitle("更新"),
+        updatesSectionView = makeSectionCard(contentViews: [
             makeLabeledRow(title: "检查更新策略", control: makeUpdateStrategyControl()),
             automaticDownloadsCheckboxRow(),
             automaticDownloadsHint(),
             updatesActionRow(),
         ])
-        updatesSection.orientation = .vertical
-        updatesSection.alignment = .leading
-        updatesSection.spacing = 10
 
-        let editorSection = NSStackView(views: [
-            makeSectionTitle("编辑器"),
+        editorSectionView = makeSectionCard(contentViews: [
             makeLabeledRow(title: "Hosts 字体大小", control: makeFontSizeControl()),
         ])
-        editorSection.orientation = .vertical
-        editorSection.alignment = .leading
-        editorSection.spacing = 10
 
-        rootStack.addArrangedSubview(updatesSection)
-        rootStack.addArrangedSubview(separator())
-        rootStack.addArrangedSubview(editorSection)
+        let rootStack = NSStackView(views: [sectionControl, updatesSectionView, editorSectionView])
+        rootStack.orientation = .vertical
+        rootStack.alignment = .leading
+        rootStack.spacing = 18
+        view.addSubview(rootStack)
 
-        NSLayoutConstraint.activate([
-            rootStack.topAnchor.constraint(equalTo: view.topAnchor, constant: 22),
-            rootStack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 24),
-            rootStack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -24),
-            rootStack.bottomAnchor.constraint(lessThanOrEqualTo: view.bottomAnchor, constant: -22),
-            view.widthAnchor.constraint(greaterThanOrEqualToConstant: 520),
-        ])
+        rootStack.snp.makeConstraints { make in
+            make.top.equalToSuperview().offset(22)
+            make.leading.trailing.equalToSuperview().inset(24)
+            make.bottom.lessThanOrEqualToSuperview().inset(22)
+        }
+
+        sectionControl.snp.makeConstraints { make in
+            make.width.equalTo(rootStack)
+        }
+
+        updatesSectionView.snp.makeConstraints { make in
+            make.width.equalTo(rootStack)
+        }
+
+        editorSectionView.snp.makeConstraints { make in
+            make.width.equalTo(rootStack)
+        }
     }
 
     private func bindSettings() {
@@ -142,10 +167,32 @@ private final class PreferencesViewController: NSViewController {
         }
     }
 
-    private func makeSectionTitle(_ title: String) -> NSTextField {
-        let label = NSTextField(labelWithString: title)
-        label.font = .systemFont(ofSize: 14, weight: .semibold)
-        return label
+    private func syncVisibleSection() {
+        sectionControl.selectedSegment = currentSection.rawValue
+        updatesSectionView.isHidden = currentSection != .updates
+        editorSectionView.isHidden = currentSection != .editor
+    }
+
+    private func makeSectionCard(contentViews: [NSView]) -> NSView {
+        let card = NSView()
+        card.wantsLayer = true
+        card.layer?.cornerRadius = 12
+        card.layer?.masksToBounds = true
+        card.layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
+        card.layer?.borderWidth = 1
+        card.layer?.borderColor = NSColor.separatorColor.cgColor
+
+        let contentStack = NSStackView(views: contentViews)
+        contentStack.orientation = .vertical
+        contentStack.alignment = .leading
+        contentStack.spacing = 12
+        card.addSubview(contentStack)
+
+        contentStack.snp.makeConstraints { make in
+            make.edges.equalToSuperview().inset(18)
+        }
+
+        return card
     }
 
     private func makeLabeledRow(title: String, control: NSView) -> NSView {
@@ -153,6 +200,9 @@ private final class PreferencesViewController: NSViewController {
         titleLabel.alignment = .right
         titleLabel.font = .systemFont(ofSize: NSFont.systemFontSize)
         titleLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
+        titleLabel.snp.makeConstraints { make in
+            make.width.equalTo(112)
+        }
 
         let row = NSStackView(views: [titleLabel, control])
         row.orientation = .horizontal
@@ -166,7 +216,9 @@ private final class PreferencesViewController: NSViewController {
         updateStrategyPopup.addItems(withTitles: UpdateCheckStrategy.allCases.map(\.title))
         updateStrategyPopup.target = self
         updateStrategyPopup.action = #selector(updateStrategyChanged(_:))
-        updateStrategyPopup.frame.size.width = 180
+        updateStrategyPopup.snp.makeConstraints { make in
+            make.width.equalTo(200)
+        }
         return updateStrategyPopup
     }
 
@@ -180,7 +232,9 @@ private final class PreferencesViewController: NSViewController {
         automaticDownloadsHintLabel = NSTextField(wrappingLabelWithString: "")
         automaticDownloadsHintLabel.textColor = .secondaryLabelColor
         automaticDownloadsHintLabel.maximumNumberOfLines = 2
-        automaticDownloadsHintLabel.widthAnchor.constraint(equalToConstant: 420).isActive = true
+        automaticDownloadsHintLabel.snp.makeConstraints { make in
+            make.width.lessThanOrEqualTo(440)
+        }
         return automaticDownloadsHintLabel
     }
 
@@ -207,11 +261,15 @@ private final class PreferencesViewController: NSViewController {
             action: #selector(fontSizeSliderChanged(_:))
         )
         fontSizeSlider.isContinuous = true
-        fontSizeSlider.frame.size.width = 220
+        fontSizeSlider.snp.makeConstraints { make in
+            make.width.equalTo(240)
+        }
 
         fontSizeValueLabel = NSTextField(labelWithString: "")
         fontSizeValueLabel.alignment = .center
-        fontSizeValueLabel.frame.size.width = 48
+        fontSizeValueLabel.snp.makeConstraints { make in
+            make.width.equalTo(50)
+        }
 
         fontSizeStepper = NSStepper()
         fontSizeStepper.minValue = AppSettings.minEditorFontSize
@@ -227,13 +285,10 @@ private final class PreferencesViewController: NSViewController {
         return row
     }
 
-    private func separator() -> NSView {
-        let box = NSBox()
-        box.boxType = .separator
-        NSLayoutConstraint.activate([
-            box.widthAnchor.constraint(equalToConstant: 440),
-        ])
-        return box
+    @objc private func sectionChanged(_ sender: NSSegmentedControl) {
+        guard let section = PreferencesSection(rawValue: sender.selectedSegment) else { return }
+        currentSection = section
+        syncVisibleSection()
     }
 
     @objc private func updateStrategyChanged(_ sender: NSPopUpButton) {
