@@ -1,7 +1,17 @@
-<?xml version="1.0" encoding="utf-8"?>
-<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+<?xml version='1.0' encoding='utf-8'?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
     <channel>
-        <title>HostsEditor Updates</title>
+        <title>HostsEditor</title>
+        <item>
+            <title>1.1</title>
+            <pubDate>Sat, 14 Mar 2026 23:36:29 +0800</pubDate>
+            <link>https://github.com/wangwanjie/HostsEditor/releases/tag/v1.1</link>
+            <sparkle:version>1</sparkle:version>
+            <sparkle:shortVersionString>1.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <sparkle:releaseNotesLink>https://github.com/wangwanjie/HostsEditor/releases/tag/v1.1</sparkle:releaseNotesLink>
+            <enclosure url="https://github.com/wangwanjie/HostsEditor/releases/download/v1.1/HostsEditor_V_1.1.dmg" length="4321199" type="application/octet-stream" sparkle:edSignature="caIS1nKzHkMRREYw9jMXCsJPVcC+uFEDzq7CHfqlZw3cwc7y0fQJgefQAXhgWUUCQFhMASFpMOegLr15G16mAg==" />
+        </item>
         <link>https://github.com/wangwanjie/HostsEditor</link>
         <description>HostsEditor release feed.</description>
         <language>zh-CN</language>
