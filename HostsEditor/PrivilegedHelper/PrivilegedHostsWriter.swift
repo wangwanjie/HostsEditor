@@ -2,7 +2,7 @@
 //  PrivilegedHostsWriter.swift
 //  HostsEditor
 //
-//  通过 SMAppService 注册 Helper Daemon，通过 XPC 写入 /etc/hosts。
+//  通过 SMAppService 注册 LaunchDaemon，并通过 XPC 写入 /etc/hosts。
 //
 
 import Foundation
@@ -10,16 +10,21 @@ import ServiceManagement
 
 private let helperLabel = "cn.vanjay.HostsEditor.Helper"
 private let daemonPlistName = "cn.vanjay.HostsEditor.Helper.plist"
+private let helperProgramIdentifier = "Contents/MacOS/cn.vanjay.HostsEditor.Helper"
+private let legacyHelperProgramIdentifier = "Contents/Library/LaunchServices/cn.vanjay.HostsEditor.Helper"
 
 enum PrivilegedHostsError: Error, LocalizedError {
     case requiresApproval
+    case registrationFailed(String)
     case connectionFailed
     case timeout
 
     var errorDescription: String? {
         switch self {
         case .requiresApproval:
-            return "需要在「系统设置 → 通用 → 登录项与扩展程序」中允许后台程序"
+            return "需要在“系统设置 -> 通用 -> 登录项与扩展程序”中允许后台帮助程序"
+        case .registrationFailed(let message):
+            return message.isEmpty ? "后台帮助程序注册失败" : message
         case .connectionFailed:
             return "无法连接帮助程序"
         case .timeout:
@@ -28,100 +33,167 @@ enum PrivilegedHostsError: Error, LocalizedError {
     }
 }
 
+private struct HelperLaunchdState {
+    let rawOutput: String
+
+    var programIdentifier: String? {
+        value(after: "program identifier = ")?.components(separatedBy: " (mode:").first
+    }
+
+    var needsLWCRUpdate: Bool {
+        rawOutput.contains("needs LWCR update")
+    }
+
+    var isSpawnFailed: Bool {
+        rawOutput.contains("job state = spawn failed") || rawOutput.contains("last exit code = 78: EX_CONFIG")
+    }
+
+    var usesLegacyProgramIdentifier: Bool {
+        programIdentifier == legacyHelperProgramIdentifier
+    }
+
+    var shouldForceRepair: Bool {
+        needsLWCRUpdate || usesLegacyProgramIdentifier || isSpawnFailed
+    }
+
+    var recoveryMessage: String {
+        if usesLegacyProgramIdentifier {
+            return "系统当前仍保留着旧版后台帮助程序路径，HostsEditor 将重新注册帮助程序。若你刚删除过旧版应用，请重新打开当前构建后再点一次“启用或修复后台帮助程序”。"
+        }
+
+        if needsLWCRUpdate {
+            return "macOS 仍在使用旧的后台任务注册记录，HostsEditor 将重新注册帮助程序。若问题仍然存在，请在“帮助”菜单中先停用后台帮助程序，再重新启用。"
+        }
+
+        return "后台帮助程序已注册，但 macOS 拉起该进程时仍然失败，HostsEditor 将重新注册帮助程序。"
+    }
+
+    private func value(after prefix: String) -> String? {
+        for line in rawOutput.split(whereSeparator: \.isNewline) {
+            let line = String(line).trimmingCharacters(in: .whitespaces)
+            guard line.hasPrefix(prefix) else { continue }
+            return String(line.dropFirst(prefix.count))
+        }
+        return nil
+    }
+}
+
 final class PrivilegedHostsWriter {
 
     static let shared = PrivilegedHostsWriter()
+
     private init() {}
 
-    // MARK: - 状态
+    private var daemonService: SMAppService {
+        SMAppService.daemon(plistName: daemonPlistName)
+    }
 
     var daemonStatus: SMAppService.Status {
-        SMAppService.daemon(plistName: daemonPlistName).status
+        daemonService.status
+    }
+
+    var hasRegisteredHelper: Bool {
+        switch daemonStatus {
+        case .notRegistered, .notFound:
+            return false
+        case .enabled, .requiresApproval:
+            return true
+        @unknown default:
+            return true
+        }
     }
 
     var isHelperInstalled: Bool {
         daemonStatus == .enabled
     }
 
-    // MARK: - 安装
+    func needsRepairAfterLaunch() async -> Bool {
+        guard daemonStatus == .enabled else { return false }
 
-    /// 注册 Daemon。
-    /// - 返回 nil：已启用，无需任何操作。
-    /// - 返回 PrivilegedHostsError.requiresApproval：需要用户在系统设置中手动允许。
-    /// - 返回其他 Error：注册失败。
-    func installHelperIfNeeded() -> Error? {
-        let service = SMAppService.daemon(plistName: daemonPlistName)
-
-        switch service.status {
-        case .enabled:
-            return nil
-        case .requiresApproval:
-            return PrivilegedHostsError.requiresApproval
-        default:
-            break
+        if let state = await currentLaunchdState(), state.shouldForceRepair {
+            return true
         }
 
-        do {
-            try service.register()
-            if service.status == .requiresApproval {
-                return PrivilegedHostsError.requiresApproval
-            }
-            return nil
-        } catch {
-            return error
-        }
+        return !(await isHelperReachable())
     }
 
-    // MARK: - XPC 操作
+    func installHelperIfNeeded() async throws {
+        try await prepareHelper(forceRepair: false)
+    }
 
-    /// 将内容写入系统 hosts 文件
+    func repairHelper() async throws {
+        try await prepareHelper(forceRepair: true)
+    }
+
+    func uninstallHelperAndWait() async throws {
+        try await uninstallHelper()
+    }
+
+    func uninstallHelper() async throws {
+        guard hasRegisteredHelper else { return }
+        try await unregisterHelper()
+    }
+
+    func reinstallHelper() async throws {
+        try await repairHelper()
+    }
+
     func writeHosts(content: String) async throws {
+        try await prepareHelper(forceRepair: false)
         guard let conn = makeConnection() else {
             throw PrivilegedHostsError.connectionFailed
         }
         defer { conn.invalidate() }
 
-        return try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
-            let proxy = conn.remoteObjectProxyWithErrorHandler { [weak conn] err in
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            let proxy = conn.remoteObjectProxyWithErrorHandler { [weak conn] error in
                 conn?.invalidate()
-                cont.resume(throwing: err)
+                continuation.resume(throwing: error)
             } as! HostsHelperProtocol
             proxy.writeHosts(content: content) { success, error in
                 if success {
-                    cont.resume()
+                    continuation.resume()
                 } else {
-                    cont.resume(throwing: error ?? PrivilegedHostsError.connectionFailed)
+                    continuation.resume(throwing: error ?? PrivilegedHostsError.connectionFailed)
                 }
             }
         }
     }
 
-    /// 从系统读取当前 hosts 内容（带 5 秒超时）
     func readHosts() async throws -> String {
+        try await prepareHelper(forceRepair: false)
         guard let conn = makeConnection() else {
             throw PrivilegedHostsError.connectionFailed
         }
         defer { conn.invalidate() }
 
-        return try await withCheckedThrowingContinuation { (cont: CheckedContinuation<String, Error>) in
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
             var finished = false
             let lock = NSLock()
+
             func resumeOnce(_ result: Result<String, Error>) {
-                lock.lock(); defer { lock.unlock() }
+                lock.lock()
+                defer { lock.unlock() }
                 guard !finished else { return }
                 finished = true
+
                 switch result {
-                case .success(let s): cont.resume(returning: s)
-                case .failure(let e): cont.resume(throwing: e)
+                case .success(let content):
+                    continuation.resume(returning: content)
+                case .failure(let error):
+                    continuation.resume(throwing: error)
                 }
             }
+
             DispatchQueue.global().asyncAfter(deadline: .now() + 5) {
                 resumeOnce(.failure(PrivilegedHostsError.timeout))
             }
-            let proxy = conn.remoteObjectProxyWithErrorHandler { [weak conn] err in
+
+            let proxy = conn.remoteObjectProxyWithErrorHandler { [weak conn] error in
                 conn?.invalidate()
-                resumeOnce(.failure(err))
+                resumeOnce(.failure(error))
             } as! HostsHelperProtocol
+
             proxy.readHosts { content, error in
                 if let content {
                     resumeOnce(.success(content))
@@ -137,5 +209,196 @@ final class PrivilegedHostsWriter {
         conn.remoteObjectInterface = NSXPCInterface(with: HostsHelperProtocol.self)
         conn.resume()
         return conn
+    }
+
+    private func prepareHelper(forceRepair: Bool) async throws {
+        switch daemonStatus {
+        case .enabled:
+            let launchdState = await currentLaunchdState()
+
+            if !forceRepair {
+                if let launchdState, launchdState.shouldForceRepair {
+                    try await repairRegisteredHelper()
+                } else if await isHelperReachable() {
+                    return
+                } else {
+                    try await repairRegisteredHelper()
+                }
+            } else {
+                try await repairRegisteredHelper()
+            }
+        case .notRegistered, .notFound:
+            try registerHelper()
+        case .requiresApproval:
+            throw PrivilegedHostsError.requiresApproval
+        @unknown default:
+            throw PrivilegedHostsError.registrationFailed("检测到未知的后台帮助程序状态")
+        }
+
+        if daemonStatus == .requiresApproval {
+            throw PrivilegedHostsError.requiresApproval
+        }
+
+        guard daemonStatus == .enabled else {
+            throw PrivilegedHostsError.registrationFailed("后台帮助程序未处于可用状态")
+        }
+
+        guard await waitForHelperReachable() else {
+            if let launchdState = await currentLaunchdState(), launchdState.shouldForceRepair {
+                throw PrivilegedHostsError.registrationFailed(launchdState.recoveryMessage)
+            }
+            throw PrivilegedHostsError.connectionFailed
+        }
+    }
+
+    private func registerHelper() throws {
+        let service = daemonService
+
+        do {
+            try service.register()
+        } catch {
+            if service.status == .enabled || service.status == .requiresApproval {
+                return
+            }
+
+            throw mapRegistrationError(error as NSError)
+        }
+    }
+
+    private func unregisterHelper() async throws {
+        let service = daemonService
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            service.unregister { [weak self] error in
+                guard let self else {
+                    continuation.resume()
+                    return
+                }
+
+                guard let nsError = error as NSError? else {
+                    continuation.resume()
+                    return
+                }
+
+                if nsError.code == kSMErrorJobNotFound {
+                    continuation.resume()
+                } else {
+                    continuation.resume(throwing: self.mapRegistrationError(nsError))
+                }
+            }
+        }
+    }
+
+    private func repairRegisteredHelper() async throws {
+        if hasRegisteredHelper {
+            try await unregisterHelper()
+            _ = await waitForHelperUnregistered()
+            try? await Task.sleep(nanoseconds: 600_000_000)
+        }
+
+        try registerHelper()
+    }
+
+    private func waitForHelperReachable(attempts: Int = 8) async -> Bool {
+        for attempt in 0..<attempts {
+            if await isHelperReachable() {
+                return true
+            }
+
+            guard attempt < attempts - 1 else { continue }
+            try? await Task.sleep(nanoseconds: 300_000_000)
+        }
+
+        return false
+    }
+
+    private func waitForHelperUnregistered(attempts: Int = 12) async -> Bool {
+        for attempt in 0..<attempts {
+            let status = daemonStatus
+            let launchdState = await currentLaunchdState()
+
+            if status == .notRegistered || status == .notFound || launchdState == nil {
+                return true
+            }
+
+            guard attempt < attempts - 1 else { continue }
+            try? await Task.sleep(nanoseconds: 500_000_000)
+        }
+
+        let status = daemonStatus
+        let launchdState = await currentLaunchdState()
+        return status == .notRegistered || status == .notFound || launchdState == nil
+    }
+
+    private func isHelperReachable(timeout: TimeInterval = 1.5) async -> Bool {
+        guard let conn = makeConnection() else { return false }
+        defer { conn.invalidate() }
+
+        return await withCheckedContinuation { continuation in
+            var finished = false
+            let lock = NSLock()
+
+            func resumeOnce(_ value: Bool) {
+                lock.lock()
+                defer { lock.unlock() }
+                guard !finished else { return }
+                finished = true
+                continuation.resume(returning: value)
+            }
+
+            DispatchQueue.global().asyncAfter(deadline: .now() + timeout) {
+                resumeOnce(false)
+            }
+
+            let proxy = conn.remoteObjectProxyWithErrorHandler { _ in
+                resumeOnce(false)
+            } as? HostsHelperProtocol
+
+            proxy?.ping { success in
+                resumeOnce(success)
+            }
+        }
+    }
+
+    private nonisolated func currentLaunchdState() async -> HelperLaunchdState? {
+        await Task.detached(priority: .utility) {
+            Self.readLaunchdState()
+        }.value
+    }
+
+    private static nonisolated func readLaunchdState() -> HelperLaunchdState? {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+        process.arguments = ["print", "system/cn.vanjay.HostsEditor.Helper"]
+
+        let outputPipe = Pipe()
+        process.standardOutput = outputPipe
+        process.standardError = outputPipe
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+        } catch {
+            return nil
+        }
+
+        guard process.terminationStatus == 0 else {
+            return nil
+        }
+
+        let data = outputPipe.fileHandleForReading.readDataToEndOfFile()
+        guard let output = String(data: data, encoding: .utf8), !output.isEmpty else {
+            return nil
+        }
+
+        return HelperLaunchdState(rawOutput: output)
+    }
+
+    private func mapRegistrationError(_ error: NSError?) -> PrivilegedHostsError {
+        if daemonStatus == .requiresApproval || error?.code == kSMErrorLaunchDeniedByUser {
+            return .requiresApproval
+        }
+
+        let message = error?.localizedDescription ?? "无法注册后台帮助程序"
+        return .registrationFailed(message)
     }
 }

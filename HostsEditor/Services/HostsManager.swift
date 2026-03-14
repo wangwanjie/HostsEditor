@@ -7,6 +7,24 @@ import Foundation
 import AppKit
 import Combine
 
+enum HelperInterventionKind: String {
+    case install
+    case approval
+    case repair
+}
+
+enum HostsWriteVerificationError: Error, LocalizedError {
+    case contentMismatch
+
+    var errorDescription: String? {
+        "系统 hosts 写入后校验失败，文件内容未更新"
+    }
+}
+
+extension Notification.Name {
+    static let hostsEditorHelperInterventionRequired = Notification.Name("HostsEditorHelperInterventionRequired")
+}
+
 @MainActor
 final class HostsManager: ObservableObject {
     static let shared = HostsManager()
@@ -36,10 +54,10 @@ final class HostsManager: ObservableObject {
     func loadProfiles() {
         guard let data = UserDefaults.standard.data(forKey: profilesKey),
               let decoded = try? JSONDecoder().decode([HostsProfile].self, from: data) else {
-            profiles = [HostsProfile(name: "默认", content: "")]
+            profiles = [HostsProfile(name: "点击可更改配置名称", content: "")]
             return
         }
-        profiles = decoded
+        profiles = decoded.isEmpty ? [HostsProfile(name: "点击可更改配置名称", content: "")] : decoded
     }
 
     func saveProfiles() {
@@ -82,28 +100,28 @@ final class HostsManager: ObservableObject {
 
     func refreshSystemContent() async {
         do {
-            let content = try await PrivilegedHostsWriter.shared.readHosts()
+            let content = try readSystemHostsContent()
             currentSystemContent = content
             let base = Self.extractBaseContent(from: content)
             baseSystemContent = base
             UserDefaults.standard.set(base, forKey: baseContentKey)
             errorMessage = nil
         } catch {
-            errorMessage = "读取系统 hosts 失败: \(error.localizedDescription)"
+            handlePrivilegedOperationError(error, operation: "读取系统 hosts")
         }
     }
 
     /// 将内容直接写入系统 hosts（用于「系统」项编辑后保存）
     func writeSystemContent(_ content: String) async {
         do {
-            try await PrivilegedHostsWriter.shared.writeHosts(content: content)
-            currentSystemContent = content
-            let base = Self.extractBaseContent(from: content)
+            let verifiedContent = try await writeAndVerifyHosts(content)
+            currentSystemContent = verifiedContent
+            let base = Self.extractBaseContent(from: verifiedContent)
             baseSystemContent = base
             UserDefaults.standard.set(base, forKey: baseContentKey)
             errorMessage = nil
         } catch {
-            errorMessage = "写入系统 hosts 失败: \(error.localizedDescription)"
+            handlePrivilegedOperationError(error, operation: "写入系统 hosts")
         }
     }
 
@@ -115,11 +133,11 @@ final class HostsManager: ObservableObject {
         defer { isLoading = false }
         let composed = composeHostsContent()
         do {
-            try await PrivilegedHostsWriter.shared.writeHosts(content: composed)
-            currentSystemContent = composed
+            let verifiedContent = try await writeAndVerifyHosts(composed)
+            currentSystemContent = verifiedContent
             errorMessage = nil
         } catch {
-            errorMessage = "写入失败: \(error.localizedDescription)"
+            handlePrivilegedOperationError(error, operation: "应用配置")
         }
     }
 
@@ -234,11 +252,81 @@ final class HostsManager: ObservableObject {
 
     // MARK: - Helper install
 
-    func installHelperIfNeeded() -> Error? {
-        PrivilegedHostsWriter.shared.installHelperIfNeeded()
+    func installHelperIfNeeded() async throws {
+        try await PrivilegedHostsWriter.shared.installHelperIfNeeded()
+    }
+
+    func uninstallHelper() async throws {
+        try await PrivilegedHostsWriter.shared.uninstallHelper()
+    }
+
+    func uninstallHelperAndWait() async throws {
+        try await PrivilegedHostsWriter.shared.uninstallHelperAndWait()
+    }
+
+    func reinstallHelper() async throws {
+        try await PrivilegedHostsWriter.shared.reinstallHelper()
     }
 
     var isHelperInstalled: Bool {
         PrivilegedHostsWriter.shared.isHelperInstalled
+    }
+
+    var hasRegisteredHelper: Bool {
+        PrivilegedHostsWriter.shared.hasRegisteredHelper
+    }
+
+    private func handlePrivilegedOperationError(_ error: Error, operation: String) {
+        errorMessage = "\(operation)失败: \(error.localizedDescription)"
+
+        guard let kind = helperInterventionKind(for: error) else { return }
+        NotificationCenter.default.post(
+            name: .hostsEditorHelperInterventionRequired,
+            object: nil,
+            userInfo: [
+                "kind": kind.rawValue,
+                "operation": operation,
+            ]
+        )
+    }
+
+    private func helperInterventionKind(for error: Error) -> HelperInterventionKind? {
+        if let privilegedError = error as? PrivilegedHostsError {
+            switch privilegedError {
+            case .requiresApproval:
+                return .approval
+            case .registrationFailed:
+                return .install
+            case .connectionFailed:
+                return .repair
+            case .timeout:
+                return nil
+            }
+        }
+
+        if error is HostsWriteVerificationError {
+            return .repair
+        }
+
+        let nsError = error as NSError
+        if nsError.domain == NSPOSIXErrorDomain,
+           let code = POSIXErrorCode(rawValue: Int32(nsError.code)),
+           code == .EPERM || code == .EACCES {
+            return .approval
+        }
+        return nil
+    }
+
+    private func readSystemHostsContent() throws -> String {
+        try String(contentsOfFile: "/etc/hosts", encoding: .utf8)
+    }
+
+    private func writeAndVerifyHosts(_ content: String) async throws -> String {
+        try await PrivilegedHostsWriter.shared.writeHosts(content: content)
+        let actualContent = try readSystemHostsContent()
+        guard actualContent == content else {
+            throw HostsWriteVerificationError.contentMismatch
+        }
+        return actualContent
     }
 }

@@ -9,6 +9,8 @@
 /* Begin PBXBuildFile section */
 		955DC8012F5E5C0000A34B51 /* cn.vanjay.HostsEditor.Helper in Embed Helper */ = {isa = PBXBuildFile; fileRef = 955DC8002F5E5C0000A34B51 /* cn.vanjay.HostsEditor.Helper */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		955DCA802F5E680000A34B51 /* cn.vanjay.HostsEditor.Helper.plist in Copy LaunchDaemon Plist */ = {isa = PBXBuildFile; fileRef = 955DCA7F2F5E680000A34B51 /* cn.vanjay.HostsEditor.Helper.plist */; };
+		955DCA832F5E680300A34B51 /* cn.vanjay.HostsEditor.Helper in Legacy Helper Compatibility */ = {isa = PBXBuildFile; fileRef = 955DC8002F5E5C0000A34B51 /* cn.vanjay.HostsEditor.Helper */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		C01E9FDAB4E7D97B06326737 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 01AF1926754AF7C59AE59BA3 /* Sparkle */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -39,8 +41,8 @@
 		955DC8072F5E5C0000A34B51 /* Embed Helper */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
-			dstPath = Contents/Library/LaunchServices;
-			dstSubfolderSpec = 1;
+			dstPath = "";
+			dstSubfolderSpec = 6;
 			files = (
 				955DC8012F5E5C0000A34B51 /* cn.vanjay.HostsEditor.Helper in Embed Helper */,
 			);
@@ -56,6 +58,17 @@
 				955DCA802F5E680000A34B51 /* cn.vanjay.HostsEditor.Helper.plist in Copy LaunchDaemon Plist */,
 			);
 			name = "Copy LaunchDaemon Plist";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		955DCA842F5E680400A34B51 /* Legacy Helper Compatibility */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = Contents/Library/LaunchServices;
+			dstSubfolderSpec = 1;
+			files = (
+				955DCA832F5E680300A34B51 /* cn.vanjay.HostsEditor.Helper in Legacy Helper Compatibility */,
+			);
+			name = "Legacy Helper Compatibility";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
@@ -76,13 +89,6 @@
 				Info.plist,
 			);
 			target = 955DC7AB2F5E5B9700A34B51 /* HostsEditor */;
-		};
-		955DCA722F5E67E100A34B51 /* Exceptions for "HostsEditorHelper" folder in "HostsEditorHelper" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Info.plist,
-			);
-			target = 955DC8032F5E5C0000A34B51 /* HostsEditorHelper */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -107,9 +113,6 @@
 		};
 		955DC8022F5E5C0000A34B51 /* HostsEditorHelper */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				955DCA722F5E67E100A34B51 /* Exceptions for "HostsEditorHelper" folder in "HostsEditorHelper" target */,
-			);
 			path = HostsEditorHelper;
 			sourceTree = "<group>";
 		};
@@ -120,6 +123,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C01E9FDAB4E7D97B06326737 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -189,6 +193,7 @@
 				955DC7A92F5E5B9700A34B51 /* Frameworks */,
 				955DC7AA2F5E5B9700A34B51 /* Resources */,
 				955DC8072F5E5C0000A34B51 /* Embed Helper */,
+				955DCA842F5E680400A34B51 /* Legacy Helper Compatibility */,
 				955DCA812F5E680100A34B51 /* Copy LaunchDaemon Plist */,
 			);
 			buildRules = (
@@ -201,6 +206,7 @@
 			);
 			name = HostsEditor;
 			packageProductDependencies = (
+				01AF1926754AF7C59AE59BA3 /* Sparkle */,
 			);
 			productName = HostsEditor;
 			productReference = 955DC7AC2F5E5B9700A34B51 /* HostsEditor.app */;
@@ -223,8 +229,6 @@
 				955DC7BF2F5E5B9900A34B51 /* HostsEditorTests */,
 			);
 			name = HostsEditorTests;
-			packageProductDependencies = (
-			);
 			productName = HostsEditorTests;
 			productReference = 955DC7BC2F5E5B9900A34B51 /* HostsEditorTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
@@ -246,8 +250,6 @@
 				955DC7C92F5E5B9900A34B51 /* HostsEditorUITests */,
 			);
 			name = HostsEditorUITests;
-			packageProductDependencies = (
-			);
 			productName = HostsEditorUITests;
 			productReference = 955DC7C62F5E5B9900A34B51 /* HostsEditorUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
@@ -268,8 +270,6 @@
 				955DC8022F5E5C0000A34B51 /* HostsEditorHelper */,
 			);
 			name = HostsEditorHelper;
-			packageProductDependencies = (
-			);
 			productName = cn.vanjay.HostsEditor.Helper;
 			productReference = 955DC8002F5E5C0000A34B51 /* cn.vanjay.HostsEditor.Helper */;
 			productType = "com.apple.product-type.tool";
@@ -306,6 +306,9 @@
 			);
 			mainGroup = 955DC7A32F5E5B9700A34B51;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				DCA1CFE03F952840914E5D99 /* XCRemoteSwiftPackageReference "Sparkle" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 955DC7AD2F5E5B9700A34B51 /* Products */;
 			projectDirPath = "";
@@ -677,7 +680,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				AUTOMATION_APPLE_EVENTS = NO;
-				CODE_SIGN_ENTITLEMENTS = HostsEditorHelper/HostsEditorHelper.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = X6B6C6U6QV;
@@ -688,17 +690,10 @@
 				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
 				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
 				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = HostsEditorHelper/Info.plist;
+				INSTALL_PATH = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.6;
 				MACOSX_DEPLOYMENT_TARGET = 13.5;
 				MARKETING_VERSION = 1.0;
-				OTHER_LDFLAGS = (
-					"-sectcreate",
-					__TEXT,
-					__info_plist,
-					"$(SRCROOT)/HostsEditorHelper/Info.plist",
-				);
 				PRODUCT_BUNDLE_IDENTIFIER = cn.vanjay.HostsEditor.Helper;
 				PRODUCT_NAME = cn.vanjay.HostsEditor.Helper;
 				RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES = NO;
@@ -717,7 +712,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				AUTOMATION_APPLE_EVENTS = NO;
-				CODE_SIGN_ENTITLEMENTS = "HostsEditorHelper/HostsEditorHelper-Release.entitlements";
 				CODE_SIGN_IDENTITY = "Developer ID Application";
 				CODE_SIGN_STYLE = Manual;
 				CODE_SIGN_TIMESTAMP = YES;
@@ -730,17 +724,10 @@
 				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
 				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
 				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = HostsEditorHelper/Info.plist;
+				INSTALL_PATH = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.6;
 				MACOSX_DEPLOYMENT_TARGET = 13.5;
 				MARKETING_VERSION = 1.0;
-				OTHER_LDFLAGS = (
-					"-sectcreate",
-					__TEXT,
-					__info_plist,
-					"$(SRCROOT)/HostsEditorHelper/Info.plist",
-				);
 				PRODUCT_BUNDLE_IDENTIFIER = cn.vanjay.HostsEditor.Helper;
 				PRODUCT_NAME = cn.vanjay.HostsEditor.Helper;
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -805,6 +792,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		DCA1CFE03F952840914E5D99 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.8.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		01AF1926754AF7C59AE59BA3 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = DCA1CFE03F952840914E5D99 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 955DC7A42F5E5B9700A34B51 /* Project object */;
 }

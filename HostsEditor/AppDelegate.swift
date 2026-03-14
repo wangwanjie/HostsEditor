@@ -14,11 +14,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var statusMenu: NSMenu?
     private var profileMenuItems: [NSMenuItem] = []
+    private var isPresentingHelperInterventionAlert = false
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleHelperInterventionNotification(_:)),
+            name: .hostsEditorHelperInterventionRequired,
+            object: nil
+        )
         buildMainMenu()
         setupStatusBar()
-        installHelperIfNeeded()
+        UpdateManager.shared.configure()
+        UpdateManager.shared.scheduleBackgroundUpdateCheck()
+        DispatchQueue.main.async { [weak self] in
+            self?.promptForHelperIfNeeded()
+        }
     }
 
     /// 用代码构建主菜单，避免 Storyboard 的 systemMenu 导致 “Internal inconsistency in menus”
@@ -27,6 +38,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         let appMenu = NSMenu()
         appMenu.addItem(NSMenuItem(title: "关于 HostsEditor", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: ""))
+        let checkForUpdatesItem = NSMenuItem(title: "检查更新…", action: #selector(checkForUpdates), keyEquivalent: "")
+        checkForUpdatesItem.target = self
+        appMenu.addItem(checkForUpdatesItem)
         appMenu.addItem(NSMenuItem.separator())
         appMenu.addItem(NSMenuItem(title: "偏好设置…", action: nil, keyEquivalent: ","))
         appMenu.addItem(NSMenuItem.separator())
@@ -78,15 +92,25 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         main.addItem(windowItem)
 
         let helpMenu = NSMenu(title: "帮助")
-        helpMenu.addItem(NSMenuItem(title: "HostsEditor 帮助", action: #selector(NSApplication.showHelp(_:)), keyEquivalent: "?"))
-        let helpItem = NSMenuItem(title: "帮助", action: nil, keyEquivalent: "")
-        helpItem.submenu = helpMenu
-        main.addItem(helpItem)
+        let helpItem = NSMenuItem(title: "HostsEditor 帮助", action: #selector(openGitHubHomepage), keyEquivalent: "?")
+        helpItem.target = self
+        helpMenu.addItem(helpItem)
+        helpMenu.addItem(NSMenuItem.separator())
+        let installHelperItem = NSMenuItem(title: "启用或修复后台帮助程序", action: #selector(installHelperFromMenu), keyEquivalent: "")
+        installHelperItem.target = self
+        helpMenu.addItem(installHelperItem)
+        let uninstallHelperItem = NSMenuItem(title: "停用后台帮助程序", action: #selector(uninstallHelperFromMenu), keyEquivalent: "")
+        uninstallHelperItem.target = self
+        helpMenu.addItem(uninstallHelperItem)
+        let helpMenuItem = NSMenuItem(title: "帮助", action: nil, keyEquivalent: "")
+        helpMenuItem.submenu = helpMenu
+        main.addItem(helpMenuItem)
 
         NSApp.mainMenu = main
     }
 
     func applicationWillTerminate(_ aNotification: Notification) {
+        NotificationCenter.default.removeObserver(self)
         statusItem = nil
     }
 
@@ -101,29 +125,171 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - 帮助程序安装
 
-    private func installHelperIfNeeded() {
-        guard !PrivilegedHostsWriter.shared.isHelperInstalled else { return }
-        if let err = HostsManager.shared.installHelperIfNeeded() {
-            DispatchQueue.main.async {
-                let alert = NSAlert()
-                if (err as? PrivilegedHostsError) == .requiresApproval {
-                    alert.messageText = "需要允许后台程序"
-                    alert.informativeText = "请在「系统设置 → 通用 → 登录项与扩展程序」中允许 HostsEditor 的后台程序运行，然后重新启动应用。"
-                    alert.alertStyle = .informational
-                    alert.addButton(withTitle: "打开系统设置")
-                    alert.addButton(withTitle: "稍后")
-                    if alert.runModal() == .alertFirstButtonReturn {
-                        SMAppService.openSystemSettingsLoginItems()
-                    }
+    private func promptForHelperIfNeeded() {
+        switch PrivilegedHostsWriter.shared.daemonStatus {
+        case .enabled:
+            Task { @MainActor in
+                guard await PrivilegedHostsWriter.shared.needsRepairAfterLaunch() else { return }
+                performHelperSetup(forceRepair: true, announceSuccess: false)
+            }
+            return
+        case .notRegistered, .notFound:
+            presentHelperInstallAlert(operation: nil)
+        case .requiresApproval:
+            presentHelperApprovalAlert(operation: nil)
+        @unknown default:
+            return
+        }
+    }
+
+    private func presentHelperInstallAlert(operation: String?) {
+        NSApp.activate(ignoringOtherApps: true)
+
+        let alert = NSAlert()
+        alert.messageText = operation == nil ? "需要启用后台帮助程序" : "需要启用后台帮助程序"
+        if let operation {
+            alert.informativeText = "要\(operation)，需要先启用 HostsEditor 的后台帮助程序。首次启用后，macOS 可能要求你在“系统设置 -> 通用 -> 登录项与扩展程序”里允许它运行。"
+        } else {
+            alert.informativeText = "HostsEditor 需要启用后台帮助程序才能写入 /etc/hosts。首次启用后，macOS 可能要求你在“系统设置 -> 通用 -> 登录项与扩展程序”里允许它运行。"
+        }
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "立即启用")
+        alert.addButton(withTitle: "稍后")
+        if alert.runModal() == .alertFirstButtonReturn {
+            performHelperSetup(forceRepair: false, announceSuccess: false)
+        }
+    }
+
+    private func presentHelperApprovalAlert(operation: String?) {
+        NSApp.activate(ignoringOtherApps: true)
+
+        let alert = NSAlert()
+        alert.messageText = "需要允许后台帮助程序"
+        if let operation {
+            alert.informativeText = "要\(operation)，请前往“系统设置 -> 通用 -> 登录项与扩展程序”允许 HostsEditor 的后台帮助程序。开启后返回应用即可继续，无需再次授权。"
+        } else {
+            alert.informativeText = "请前往“系统设置 -> 通用 -> 登录项与扩展程序”允许 HostsEditor 的后台帮助程序。开启后返回应用即可继续写入或读取 hosts，无需再次授权。"
+        }
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "打开系统设置")
+        alert.addButton(withTitle: "稍后")
+        if alert.runModal() == .alertFirstButtonReturn {
+            SMAppService.openSystemSettingsLoginItems()
+        }
+    }
+
+    private func showHelperInstallError(_ err: Error) {
+        let alert = NSAlert()
+        if let privilegedError = err as? PrivilegedHostsError,
+           case .registrationFailed(let message) = privilegedError {
+            alert.messageText = "启用后台帮助程序失败"
+            alert.informativeText = message
+        } else {
+            alert.messageText = "启用后台帮助程序失败"
+            alert.informativeText = err.localizedDescription
+        }
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "确定")
+        alert.runModal()
+    }
+
+    private func performHelperSetup(forceRepair: Bool, announceSuccess: Bool) {
+        Task { @MainActor in
+            do {
+                if forceRepair {
+                    try await HostsManager.shared.reinstallHelper()
                 } else {
-                    alert.messageText = "安装帮助程序失败"
-                    alert.informativeText = err.localizedDescription
-                    alert.alertStyle = .warning
-                    alert.addButton(withTitle: "确定")
-                    alert.runModal()
+                    try await HostsManager.shared.installHelperIfNeeded()
                 }
+
+                guard announceSuccess else { return }
+                let alert = NSAlert()
+                alert.messageText = "后台帮助程序已就绪"
+                alert.informativeText = "现在可以继续写入系统 hosts 文件。后续只要该后台帮助程序保持允许状态，就不需要再次授权。"
+                alert.alertStyle = .informational
+                alert.addButton(withTitle: "确定")
+                alert.runModal()
+            } catch let privilegedError as PrivilegedHostsError {
+                switch privilegedError {
+                case .requiresApproval:
+                    presentHelperApprovalAlert(operation: nil)
+                case .registrationFailed, .connectionFailed, .timeout:
+                    showHelperInstallError(privilegedError)
+                }
+            } catch {
+                showHelperInstallError(error)
             }
         }
+    }
+
+    @objc private func installHelperFromMenu() {
+        performHelperSetup(forceRepair: true, announceSuccess: true)
+    }
+
+    @objc private func uninstallHelperFromMenu() {
+        let alert = NSAlert()
+        alert.messageText = "停用后台帮助程序"
+        alert.informativeText = "停用后将无法直接写入系统 hosts，直到重新启用。"
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "停用")
+        alert.addButton(withTitle: "取消")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+
+        Task { @MainActor in
+            do {
+                try await HostsManager.shared.uninstallHelperAndWait()
+                let success = NSAlert()
+                success.messageText = "后台帮助程序已停用"
+                success.informativeText = "如需继续编辑系统 hosts，可在“帮助”菜单中重新启用。"
+                success.alertStyle = .informational
+                success.addButton(withTitle: "确定")
+                success.runModal()
+            } catch {
+                let failure = NSAlert()
+                failure.messageText = "停用后台帮助程序失败"
+                failure.informativeText = error.localizedDescription
+                failure.alertStyle = .warning
+                failure.addButton(withTitle: "确定")
+                failure.runModal()
+            }
+        }
+    }
+
+    @objc private func handleHelperInterventionNotification(_ notification: Notification) {
+        guard !isPresentingHelperInterventionAlert,
+              let kindRawValue = notification.userInfo?["kind"] as? String,
+              let kind = HelperInterventionKind(rawValue: kindRawValue),
+              let operation = notification.userInfo?["operation"] as? String else { return }
+
+        isPresentingHelperInterventionAlert = true
+        defer { isPresentingHelperInterventionAlert = false }
+
+        NSApp.activate(ignoringOtherApps: true)
+
+        switch kind {
+        case .install:
+            presentHelperInstallAlert(operation: operation)
+        case .approval:
+            presentHelperApprovalAlert(operation: operation)
+        case .repair:
+            let alert = NSAlert()
+            alert.messageText = "需要修复后台帮助程序"
+            alert.informativeText = "要\(operation)，HostsEditor 需要重新注册后台帮助程序。通常这是应用更新后 helper 可执行文件变更导致的，修复后不需要再次重复授权。"
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: "立即修复")
+            alert.addButton(withTitle: "稍后")
+            if alert.runModal() == .alertFirstButtonReturn {
+                performHelperSetup(forceRepair: true, announceSuccess: false)
+            }
+        }
+    }
+
+    @objc private func checkForUpdates() {
+        UpdateManager.shared.checkForUpdates()
+    }
+
+    @objc private func openGitHubHomepage() {
+        UpdateManager.shared.openGitHubHomepage()
     }
 
     // MARK: - 菜单栏
@@ -186,5 +352,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 extension AppDelegate: NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         if menu == statusMenu { rebuildProfileMenuItems() }
+    }
+}
+
+extension AppDelegate: NSMenuItemValidation {
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        switch menuItem.action {
+        case #selector(installHelperFromMenu):
+            return true
+        case #selector(uninstallHelperFromMenu):
+            return HostsManager.shared.hasRegisteredHelper
+        default:
+            return true
+        }
     }
 }

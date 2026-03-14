@@ -5,7 +5,7 @@
 	<key>Label</key>
 	<string>cn.vanjay.HostsEditor.Helper</string>
 	<key>BundleProgram</key>
-	<string>Contents/Library/LaunchServices/cn.vanjay.HostsEditor.Helper</string>
+	<string>Contents/MacOS/cn.vanjay.HostsEditor.Helper</string>
 	<key>MachServices</key>
 	<dict>
 		<key>cn.vanjay.HostsEditor.Helper</key>
