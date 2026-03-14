@@ -136,8 +136,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// 显式启用 secure restorable state，避免系统在启动时输出 secure coding 警告。
+    /// 具体是否保存/恢复窗口状态，仍由下面两个 delegate 方法统一禁用。
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
-        return false
+        return true
     }
 
     /// 关闭窗口状态恢复，避免 restoreWindowWithIdentifier 报 className=(null)

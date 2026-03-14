@@ -150,26 +150,20 @@ class ViewController: NSViewController {
         updateButtonsForSelection()
     }
 
-    private var didSetSplitPosition = false
     private var didConfigureWindowFrameAutosave = false
+
+    override func viewWillAppear() {
+        super.viewWillAppear()
+        configureWindowIfNeeded()
+    }
 
     override func viewDidAppear() {
         super.viewDidAppear()
-        configureWindowIfNeeded()
         if profileTableView.selectedRow < 0 {
             profileTableView.selectRowIndexes(IndexSet(integer: systemRow), byExtendingSelection: false)
             selection = .system
             updateButtonsForSelection()
         }
-        DispatchQueue.main.async { [weak self] in
-            self?.applySplitPositionIfNeeded()
-        }
-    }
-
-    private func applySplitPositionIfNeeded() {
-        guard !didSetSplitPosition, splitView.subviews.count >= 2, splitView.bounds.width > 300 else { return }
-        splitView.setPosition(220, ofDividerAt: 0)
-        didSetSplitPosition = true
     }
 
     private func configureWindowIfNeeded() {

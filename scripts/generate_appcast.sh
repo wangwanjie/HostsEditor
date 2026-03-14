@@ -269,14 +269,15 @@ TMP_APPCAST="$TMP_DIR/appcast.xml"
     -o "$TMP_APPCAST" \
     "$TMP_DIR"
 
-/usr/bin/python3 - "$TMP_APPCAST" "$OUTPUT_PATH" "$REPO" <<'PY'
+/usr/bin/python3 - "$TMP_APPCAST" "$OUTPUT_PATH" "$REPO" "$TMP_DIR" <<'PY'
+import html
 import pathlib
 import re
 import sys
 import urllib.parse
 import xml.etree.ElementTree as ET
 
-input_path, output_path, repo = sys.argv[1:4]
+input_path, output_path, repo, archives_dir = sys.argv[1:5]
 sparkle_ns = "http://www.andymatuschak.org/xml-namespaces/sparkle"
 dc_ns = "http://purl.org/dc/elements/1.1/"
 ET.register_namespace("sparkle", sparkle_ns)
@@ -293,6 +294,130 @@ def find_or_create(parent, tag):
     if node is None:
         node = ET.SubElement(parent, tag)
     return node
+
+def replace_inline_markup(text):
+    escaped = html.escape(text, quote=False)
+
+    def replace_markdown_link(match):
+        label = match.group(1)
+        url = html.escape(match.group(2), quote=True)
+        return f'<a href="{url}">{label}</a>'
+
+    escaped = re.sub(r"\[([^\]]+)\]\((https?://[^)]+)\)", replace_markdown_link, escaped)
+    escaped = re.sub(r"(?<!\*)\*\*([^*]+)\*\*", r"<strong>\1</strong>", escaped)
+    escaped = re.sub(r"(?<!\*)\*([^*]+)\*", r"<em>\1</em>", escaped)
+
+    url_pattern = re.compile(r"(?<![\"'>])(https?://[^\s<]+)")
+    escaped = url_pattern.sub(lambda match: f'<a href="{html.escape(match.group(1), quote=True)}">{match.group(1)}</a>', escaped)
+    return escaped
+
+def markdown_to_html(markdown_text):
+    lines = markdown_text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    blocks = []
+    paragraph_lines = []
+    list_items = []
+    in_code_block = False
+    code_lines = []
+
+    def flush_paragraph():
+        nonlocal paragraph_lines
+        if not paragraph_lines:
+            return
+        content = "<br/>".join(replace_inline_markup(line.strip()) for line in paragraph_lines if line.strip())
+        if content:
+            blocks.append(f"<p>{content}</p>")
+        paragraph_lines = []
+
+    def flush_list():
+        nonlocal list_items
+        if not list_items:
+            return
+        items_html = "".join(f"<li>{replace_inline_markup(item)}</li>" for item in list_items)
+        blocks.append(f"<ul>{items_html}</ul>")
+        list_items = []
+
+    def flush_code_block():
+        nonlocal code_lines
+        if not code_lines:
+            return
+        blocks.append(f"<pre><code>{html.escape(chr(10).join(code_lines))}</code></pre>")
+        code_lines = []
+
+    for raw_line in lines:
+        line = raw_line.rstrip()
+        stripped = line.strip()
+
+        if stripped.startswith("```"):
+            flush_paragraph()
+            flush_list()
+            if in_code_block:
+                flush_code_block()
+            in_code_block = not in_code_block
+            continue
+
+        if in_code_block:
+            code_lines.append(line)
+            continue
+
+        if not stripped:
+            flush_paragraph()
+            flush_list()
+            continue
+
+        heading_match = re.match(r"^(#{1,6})\s+(.*)$", stripped)
+        if heading_match:
+            flush_paragraph()
+            flush_list()
+            level = len(heading_match.group(1))
+            blocks.append(f"<h{level}>{replace_inline_markup(heading_match.group(2).strip())}</h{level}>")
+            continue
+
+        if re.fullmatch(r"[-*_]{3,}", stripped):
+            flush_paragraph()
+            flush_list()
+            blocks.append("<hr/>")
+            continue
+
+        list_match = re.match(r"^[-*]\s+(.*)$", stripped)
+        if list_match:
+            flush_paragraph()
+            list_items.append(list_match.group(1).strip())
+            continue
+
+        flush_list()
+        paragraph_lines.append(line)
+
+    flush_paragraph()
+    flush_list()
+    if in_code_block:
+        flush_code_block()
+
+    return "\n".join(blocks).strip()
+
+def plain_text_to_html(text):
+    escaped = html.escape(text.strip(), quote=False)
+    if not escaped:
+        return ""
+    escaped = escaped.replace("\r\n", "\n").replace("\r", "\n")
+    return f"<div style=\"white-space: pre-wrap;\">{escaped}</div>"
+
+def load_release_notes_html(filename):
+    base_name = pathlib.Path(filename).stem
+    base_path = pathlib.Path(archives_dir) / base_name
+
+    html_path = pathlib.Path(f"{base_path}.html")
+    if html_path.exists():
+        return html_path.read_text(encoding="utf-8").strip()
+
+    markdown_path = pathlib.Path(f"{base_path}.md")
+    if markdown_path.exists():
+        return markdown_to_html(markdown_path.read_text(encoding="utf-8"))
+
+    text_path = pathlib.Path(f"{base_path}.txt")
+    if text_path.exists():
+        return plain_text_to_html(text_path.read_text(encoding="utf-8"))
+
+    return ""
 
 title_node = find_or_create(channel, "title")
 if not (title_node.text or "").strip():
@@ -346,13 +471,18 @@ for item in channel.findall("item"):
     item_link = find_or_create(item, "link")
     item_link.text = release_url
 
+    description = find_or_create(item, "description")
+    release_notes_html = load_release_notes_html(filename)
+    if release_notes_html:
+        description.text = release_notes_html
+
     release_notes = item.find(f"{{{sparkle_ns}}}releaseNotesLink")
     if release_notes is not None:
-        release_notes.text = release_url
+        item.remove(release_notes)
 
     full_release_notes = item.find(f"{{{sparkle_ns}}}fullReleaseNotesLink")
     if full_release_notes is not None:
-        full_release_notes.text = release_url
+        item.remove(full_release_notes)
 
 ET.indent(tree, space="    ")
 tree.write(output_path, encoding="utf-8", xml_declaration=True)
