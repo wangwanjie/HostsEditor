@@ -388,7 +388,7 @@ class ViewController: NSViewController {
         applyButton.isEnabled = canSave && isContentDirty && !manager.isLoading
         let isDeletableProfile: Bool
         if case .profile = selection { isDeletableProfile = true } else { isDeletableProfile = false }
-        removeProfileButton.isEnabled = isDeletableProfile
+        removeProfileButton.isEnabled = isDeletableProfile && !manager.isLoading
         refreshButton.isHidden = selection != .system
         if case .profile(let id) = selection, manager.profile(for: id)?.isRemote == true {
             refreshRemoteButton.isHidden = false
@@ -475,9 +475,15 @@ class ViewController: NSViewController {
 
     private func performRemoveProfile() {
         guard case .profile(let id) = selection else { return }
-        pendingEdits.removeValue(forKey: id)
-        selection = .system
-        Task { await manager.deleteProfile(id: id) }
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            let didDelete = await self.manager.deleteProfile(id: id)
+            guard didDelete else { return }
+
+            self.pendingEdits.removeValue(forKey: id)
+            self.profileTableView.selectRowIndexes(IndexSet(integer: self.systemRow), byExtendingSelection: false)
+            self.selection = .system
+        }
     }
 
     @objc private func removeProfile() {

@@ -33,6 +33,7 @@ final class HostsManager: ObservableObject {
         case writeSystemContent(String)
         case writeComposedHosts
         case setProfileEnabled(id: String, enabled: Bool)
+        case deleteProfile(id: String)
     }
 
     @Published private(set) var profiles: [HostsProfile] = []
@@ -86,10 +87,32 @@ final class HostsManager: ObservableObject {
         saveProfiles()
     }
 
-    func deleteProfile(id: String) async {
-        profiles.removeAll { $0.id == id }
-        saveProfiles()
-        await writeComposedHosts()
+    func deleteProfile(id: String) async -> Bool {
+        let previousProfiles = profiles
+        let updatedProfiles = previousProfiles.filter { $0.id != id }
+        guard updatedProfiles.count != previousProfiles.count else { return false }
+
+        let currentComposedHosts = composeHostsContent(from: previousProfiles)
+        let updatedComposedHosts = composeHostsContent(from: updatedProfiles)
+
+        if currentComposedHosts == updatedComposedHosts {
+            profiles = updatedProfiles
+            saveProfiles()
+            pendingPrivilegedOperation = nil
+            errorMessage = nil
+            return true
+        }
+
+        do {
+            try await applyComposedHosts(using: updatedProfiles)
+            profiles = updatedProfiles
+            saveProfiles()
+            return true
+        } catch {
+            queuePendingPrivilegedOperation(.deleteProfile(id: id), for: error)
+            handlePrivilegedOperationError(error, operation: "删除配置")
+            return false
+        }
     }
 
     func setProfileEnabled(id: String, enabled: Bool) async {
@@ -155,6 +178,10 @@ final class HostsManager: ObservableObject {
     }
 
     func composeHostsContent() -> String {
+        composeHostsContent(from: profiles)
+    }
+
+    private func composeHostsContent(from profiles: [HostsProfile]) -> String {
         var parts: [String] = []
         if !baseSystemContent.isEmpty {
             parts.append(baseSystemContent)
@@ -300,6 +327,8 @@ final class HostsManager: ObservableObject {
             await writeComposedHosts()
         case .setProfileEnabled(let id, let enabled):
             await setProfileEnabled(id: id, enabled: enabled)
+        case .deleteProfile(let id):
+            _ = await deleteProfile(id: id)
         }
     }
 
@@ -370,10 +399,14 @@ final class HostsManager: ObservableObject {
     }
 
     private func applyComposedHosts() async throws {
+        try await applyComposedHosts(using: profiles)
+    }
+
+    private func applyComposedHosts(using profiles: [HostsProfile]) async throws {
         isLoading = true
         defer { isLoading = false }
 
-        let composed = composeHostsContent()
+        let composed = composeHostsContent(from: profiles)
         let verifiedContent = try await writeAndVerifyHosts(composed)
         currentSystemContent = verifiedContent
         pendingPrivilegedOperation = nil
