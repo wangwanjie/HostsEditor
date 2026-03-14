@@ -126,6 +126,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - 帮助程序安装
 
     private func promptForHelperIfNeeded() {
+        if HostsManager.shared.isHelperExplicitlyDisabled {
+            return
+        }
+
         switch PrivilegedHostsWriter.shared.daemonStatus {
         case .enabled:
             return
@@ -203,7 +207,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 if forceRepair {
                     try await HostsManager.shared.reinstallHelper()
                 } else {
-                    try await HostsManager.shared.installHelperIfNeeded()
+                    try await HostsManager.shared.enableHelper()
                 }
 
                 guard announceSuccess else { return }
@@ -217,7 +221,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 switch privilegedError {
                 case .requiresApproval:
                     presentHelperApprovalAlert(operation: nil)
-                case .registrationFailed, .repairRequired, .connectionFailed, .timeout:
+                case .disabledByUser, .registrationFailed, .repairRequired, .connectionFailed, .timeout:
                     showHelperInstallError(privilegedError)
                 }
             } catch {
@@ -272,7 +276,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         switch kind {
         case .install:
-            presentHelperInstallAlert(operation: operation)
+            if HostsManager.shared.isHelperExplicitlyDisabled {
+                let alert = NSAlert()
+                alert.messageText = "后台帮助程序已停用"
+                alert.informativeText = "要\(operation)，请先在“帮助”菜单中重新启用后台帮助程序。"
+                alert.alertStyle = .informational
+                alert.addButton(withTitle: "重新启用")
+                alert.addButton(withTitle: "取消")
+                if alert.runModal() == .alertFirstButtonReturn {
+                    performHelperSetup(forceRepair: false, announceSuccess: false)
+                }
+            } else {
+                presentHelperInstallAlert(operation: operation)
+            }
         case .approval:
             presentHelperApprovalAlert(operation: operation)
         case .repair:

@@ -12,9 +12,11 @@ private let helperLabel = "cn.vanjay.HostsEditorHelper"
 private let daemonPlistName = "cn.vanjay.HostsEditorHelper.plist"
 private let helperExecutableName = "HostsEditorHelper"
 private let helperProgramIdentifier = "Contents/MacOS/\(helperExecutableName)"
+private let helperExplicitlyDisabledKey = "HostsEditorHelperExplicitlyDisabled"
 
 enum PrivilegedHostsError: Error, LocalizedError {
     case requiresApproval
+    case disabledByUser
     case registrationFailed(String)
     case repairRequired(String)
     case connectionFailed
@@ -24,6 +26,8 @@ enum PrivilegedHostsError: Error, LocalizedError {
         switch self {
         case .requiresApproval:
             return "需要在“系统设置 -> 通用 -> 登录项与扩展程序”中允许后台帮助程序"
+        case .disabledByUser:
+            return "后台帮助程序已停用，请在“帮助”菜单中重新启用后再写入 hosts"
         case .registrationFailed(let message):
             return message.isEmpty ? "后台帮助程序注册失败" : message
         case .repairRequired(let message):
@@ -106,6 +110,10 @@ final class PrivilegedHostsWriter {
         daemonStatus == .enabled
     }
 
+    var isHelperExplicitlyDisabled: Bool {
+        UserDefaults.standard.bool(forKey: helperExplicitlyDisabledKey)
+    }
+
     func needsRepairAfterLaunch() async -> Bool {
         guard daemonStatus == .enabled else { return false }
         guard let state = await currentLaunchdState() else { return false }
@@ -116,12 +124,31 @@ final class PrivilegedHostsWriter {
         try await prepareHelper(forceRepair: false)
     }
 
+    func enableHelper() async throws {
+        setHelperExplicitlyDisabled(false)
+        try await prepareHelper(forceRepair: false)
+    }
+
     func repairHelper() async throws {
+        setHelperExplicitlyDisabled(false)
         try await prepareHelper(forceRepair: true)
     }
 
     func uninstallHelperAndWait() async throws {
-        try await uninstallHelper()
+        let helperReachable = await isHelperReachable(timeout: 0.5)
+
+        guard hasRegisteredHelper || helperReachable else {
+            setHelperExplicitlyDisabled(true)
+            return
+        }
+
+        try await unregisterHelper()
+
+        guard await waitForHelperUnregistered() else {
+            throw PrivilegedHostsError.registrationFailed("后台帮助程序仍在卸载中，请稍后再试")
+        }
+
+        setHelperExplicitlyDisabled(true)
     }
 
     func uninstallHelper() async throws {
@@ -223,6 +250,9 @@ final class PrivilegedHostsWriter {
                 }
             }
         case .notRegistered, .notFound:
+            if isHelperExplicitlyDisabled {
+                throw PrivilegedHostsError.disabledByUser
+            }
             try registerHelper()
         case .requiresApproval:
             throw PrivilegedHostsError.requiresApproval
@@ -251,8 +281,12 @@ final class PrivilegedHostsWriter {
 
         do {
             try service.register()
+            setHelperExplicitlyDisabled(false)
         } catch {
             if service.status == .enabled || service.status == .requiresApproval {
+                if service.status == .enabled {
+                    setHelperExplicitlyDisabled(false)
+                }
                 return
             }
 
@@ -395,5 +429,9 @@ final class PrivilegedHostsWriter {
 
         let message = error?.localizedDescription ?? "无法注册后台帮助程序"
         return .registrationFailed(message)
+    }
+
+    private func setHelperExplicitlyDisabled(_ disabled: Bool) {
+        UserDefaults.standard.set(disabled, forKey: helperExplicitlyDisabledKey)
     }
 }

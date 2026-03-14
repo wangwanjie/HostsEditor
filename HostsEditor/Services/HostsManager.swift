@@ -256,6 +256,10 @@ final class HostsManager: ObservableObject {
         try await PrivilegedHostsWriter.shared.installHelperIfNeeded()
     }
 
+    func enableHelper() async throws {
+        try await PrivilegedHostsWriter.shared.enableHelper()
+    }
+
     func uninstallHelper() async throws {
         try await PrivilegedHostsWriter.shared.uninstallHelper()
     }
@@ -270,6 +274,10 @@ final class HostsManager: ObservableObject {
 
     var isHelperInstalled: Bool {
         PrivilegedHostsWriter.shared.isHelperInstalled
+    }
+
+    var isHelperExplicitlyDisabled: Bool {
+        PrivilegedHostsWriter.shared.isHelperExplicitlyDisabled
     }
 
     var hasRegisteredHelper: Bool {
@@ -295,6 +303,8 @@ final class HostsManager: ObservableObject {
             switch privilegedError {
             case .requiresApproval:
                 return .approval
+            case .disabledByUser:
+                return .install
             case .registrationFailed:
                 return .install
             case .repairRequired:
