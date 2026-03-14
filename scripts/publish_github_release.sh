@@ -27,6 +27,7 @@ NOTES_FILE=""
 GENERATE_NOTES=false
 DRAFT=false
 PRERELEASE=false
+GITHUB_API_BASE="https://api.github.com"
 
 usage() {
     cat <<'EOF'
@@ -187,6 +188,202 @@ read_marketing_version() {
     fi
 }
 
+resolve_github_token() {
+    if [[ -n "${GITHUB_TOKEN:-}" ]]; then
+        printf '%s\n' "$GITHUB_TOKEN"
+        return 0
+    fi
+
+    if [[ -n "${GH_TOKEN:-}" ]]; then
+        printf '%s\n' "$GH_TOKEN"
+        return 0
+    fi
+
+    local credential_output
+    local password
+
+    credential_output="$(printf 'protocol=https\nhost=github.com\n\n' | git credential fill 2>/dev/null || true)"
+    password="$(printf '%s\n' "$credential_output" | sed -n 's/^password=//p' | head -1)"
+
+    if [[ -n "$password" ]]; then
+        printf '%s\n' "$password"
+        return 0
+    fi
+
+    return 1
+}
+
+url_encode() {
+    /usr/bin/python3 - "$1" <<'PY'
+import sys
+import urllib.parse
+
+print(urllib.parse.quote(sys.argv[1], safe=""))
+PY
+}
+
+json_get() {
+    local path="$1"
+
+    /usr/bin/python3 - "$path" <<'PY'
+import json
+import sys
+
+path = [part for part in sys.argv[1].split(".") if part]
+value = json.load(sys.stdin)
+
+for part in path:
+    if isinstance(value, dict):
+        value = value.get(part)
+    elif isinstance(value, list):
+        try:
+            index = int(part)
+        except ValueError:
+            value = None
+            break
+        value = value[index] if 0 <= index < len(value) else None
+    else:
+        value = None
+        break
+
+if value is None:
+    raise SystemExit(1)
+
+if isinstance(value, (dict, list)):
+    print(json.dumps(value))
+else:
+    print(value)
+PY
+}
+
+json_find_release_asset_id() {
+    local asset_name="$1"
+
+    /usr/bin/python3 - "$asset_name" <<'PY'
+import json
+import sys
+
+asset_name = sys.argv[1]
+assets = json.load(sys.stdin).get("assets") or []
+
+for asset in assets:
+    if asset.get("name") == asset_name:
+        asset_id = asset.get("id")
+        if asset_id is not None:
+            print(asset_id)
+        break
+PY
+}
+
+github_api_request() {
+    local method="$1"
+    local url="$2"
+    shift 2
+
+    curl -fsSL \
+        -X "$method" \
+        -H "Accept: application/vnd.github+json" \
+        -H "Authorization: Bearer $GITHUB_API_TOKEN" \
+        -H "X-GitHub-Api-Version: 2022-11-28" \
+        "$@" \
+        "$url"
+}
+
+github_create_release_payload() {
+    local tag="$1"
+    local title="$2"
+    local draft="$3"
+    local prerelease="$4"
+    local generate_notes="$5"
+
+    RELEASE_NOTES_CONTENT="${RELEASE_NOTES_CONTENT:-}" /usr/bin/python3 - "$tag" "$title" "$draft" "$prerelease" "$generate_notes" <<'PY'
+import json
+import os
+import sys
+
+tag, title, draft, prerelease, generate_notes = sys.argv[1:6]
+payload = {
+    "tag_name": tag,
+    "name": title,
+    "draft": draft == "true",
+    "prerelease": prerelease == "true",
+}
+
+if generate_notes == "true":
+    payload["generate_release_notes"] = True
+else:
+    payload["body"] = os.environ.get("RELEASE_NOTES_CONTENT", "")
+
+print(json.dumps(payload))
+PY
+}
+
+publish_with_github_api() {
+    local dmg_name
+    local release_json
+    local release_id
+    local release_url
+    local release_body
+    local asset_id
+    local notes_content
+    local payload
+    local upload_name
+    local encoded_name
+    local upload_url
+
+    GITHUB_API_TOKEN="$(resolve_github_token)"
+    if [[ -z "$GITHUB_API_TOKEN" ]]; then
+        echo "错误: 未找到 GitHub 凭据，请设置 GITHUB_TOKEN 或先让 git 保存 github.com 的 HTTPS 凭据" >&2
+        exit 1
+    fi
+
+    dmg_name="$(basename "$DMG_PATH")"
+
+    if release_json="$(github_api_request GET "$GITHUB_API_BASE/repos/$REPO/releases/tags/$TAG" 2>/dev/null)"; then
+        echo "Release 已存在，上传并覆盖同名资源..."
+    else
+        echo "Release 不存在，正在创建..."
+
+        if [[ "$GENERATE_NOTES" == true ]]; then
+            RELEASE_NOTES_CONTENT=""
+        elif [[ -n "$NOTES_FILE" ]]; then
+            RELEASE_NOTES_CONTENT="$(<"$NOTES_FILE")"
+        else
+            RELEASE_NOTES_CONTENT="${NOTES:-Release $TAG}"
+        fi
+
+        payload="$(github_create_release_payload "$TAG" "$TITLE" "$DRAFT" "$PRERELEASE" "$GENERATE_NOTES")"
+        release_json="$(github_api_request POST "$GITHUB_API_BASE/repos/$REPO/releases" \
+            -H "Content-Type: application/json" \
+            -d "$payload")"
+    fi
+
+    release_id="$(printf '%s' "$release_json" | json_get "id")"
+    release_url="$(printf '%s' "$release_json" | json_get "html_url")"
+    release_body="$(printf '%s' "$release_json" | json_get "body" 2>/dev/null || true)"
+
+    asset_id="$(printf '%s' "$release_json" | json_find_release_asset_id "$dmg_name")"
+    if [[ -n "$asset_id" ]]; then
+        github_api_request DELETE "$GITHUB_API_BASE/repos/$REPO/releases/assets/$asset_id" >/dev/null
+    fi
+
+    upload_name="$dmg_name"
+    encoded_name="$(url_encode "$upload_name")"
+    upload_url="https://uploads.github.com/repos/$REPO/releases/$release_id/assets?name=$encoded_name"
+
+    github_api_request POST "$upload_url" \
+        -H "Content-Type: application/octet-stream" \
+        --data-binary @"$DMG_PATH" >/dev/null
+
+    echo "完成: $release_url"
+
+    APPCAST_NOTES="$release_body"
+    if [[ -z "$APPCAST_NOTES" ]]; then
+        notes_content="$(github_api_request GET "$GITHUB_API_BASE/repos/$REPO/releases/tags/$TAG")"
+        APPCAST_NOTES="$(printf '%s' "$notes_content" | json_get "body" 2>/dev/null || true)"
+    fi
+}
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --dmg)
@@ -272,11 +469,11 @@ if [[ "$GENERATE_NOTES" == true && ( -n "$NOTES" || -n "$NOTES_FILE" ) ]]; then
 fi
 
 require_command git
-require_command gh
 
 if ! gh auth status >/dev/null 2>&1; then
-    echo "错误: GitHub CLI 尚未登录，请先执行 gh auth login" >&2
-    exit 1
+    HAS_GH=false
+else
+    HAS_GH=true
 fi
 
 if [[ -n "$DMG_PATH" ]]; then
@@ -327,35 +524,40 @@ echo "Tag: $TAG"
 echo "标题: $TITLE"
 echo "DMG: $DMG_PATH"
 
-if gh release view "$TAG" -R "$REPO" >/dev/null 2>&1; then
-    echo "Release 已存在，上传并覆盖同名资源..."
-    gh release upload "$TAG" "$DMG_PATH" -R "$REPO" --clobber
-else
-    echo "Release 不存在，正在创建..."
-    create_args=(release create "$TAG" "$DMG_PATH" -R "$REPO" --title "$TITLE")
-
-    if [[ "$GENERATE_NOTES" == true ]]; then
-        create_args+=(--generate-notes)
-    elif [[ -n "$NOTES_FILE" ]]; then
-        create_args+=(--notes-file "$NOTES_FILE")
+if [[ "$HAS_GH" == true ]]; then
+    if gh release view "$TAG" -R "$REPO" >/dev/null 2>&1; then
+        echo "Release 已存在，上传并覆盖同名资源..."
+        gh release upload "$TAG" "$DMG_PATH" -R "$REPO" --clobber
     else
-        create_args+=(--notes "${NOTES:-Release $TAG}")
+        echo "Release 不存在，正在创建..."
+        create_args=(release create "$TAG" "$DMG_PATH" -R "$REPO" --title "$TITLE")
+
+        if [[ "$GENERATE_NOTES" == true ]]; then
+            create_args+=(--generate-notes)
+        elif [[ -n "$NOTES_FILE" ]]; then
+            create_args+=(--notes-file "$NOTES_FILE")
+        else
+            create_args+=(--notes "${NOTES:-Release $TAG}")
+        fi
+
+        if [[ "$DRAFT" == true ]]; then
+            create_args+=(--draft)
+        fi
+
+        if [[ "$PRERELEASE" == true ]]; then
+            create_args+=(--prerelease)
+        fi
+
+        gh "${create_args[@]}"
     fi
 
-    if [[ "$DRAFT" == true ]]; then
-        create_args+=(--draft)
-    fi
+    echo "完成: https://github.com/$REPO/releases/tag/$TAG"
 
-    if [[ "$PRERELEASE" == true ]]; then
-        create_args+=(--prerelease)
-    fi
-
-    gh "${create_args[@]}"
+    APPCAST_NOTES="$(gh release view "$TAG" -R "$REPO" --json body --jq '.body // ""' 2>/dev/null || true)"
+else
+    echo "未检测到可用的 GitHub CLI，改用 GitHub API 发布..."
+    publish_with_github_api
 fi
-
-echo "完成: https://github.com/$REPO/releases/tag/$TAG"
-
-APPCAST_NOTES="$(gh release view "$TAG" -R "$REPO" --json body --jq '.body // ""' 2>/dev/null || true)"
 APPCAST_ARGS=(--repo "$REPO" --archive "$DMG_PATH")
 if [[ -n "$APPCAST_NOTES" ]]; then
     APPCAST_ARGS+=(--notes "$APPCAST_NOTES")
