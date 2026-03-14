@@ -87,9 +87,16 @@ final class HostsManager: ObservableObject {
 
     func setProfileEnabled(id: String, enabled: Bool) async {
         guard let idx = profiles.firstIndex(where: { $0.id == id }) else { return }
+        let previousProfiles = profiles
         profiles[idx].isEnabled = enabled
         saveProfiles()
-        await writeComposedHosts()
+        do {
+            try await applyComposedHosts()
+        } catch {
+            profiles = previousProfiles
+            saveProfiles()
+            handlePrivilegedOperationError(error, operation: "应用配置")
+        }
     }
 
     func profile(for id: String) -> HostsProfile? {
@@ -129,13 +136,8 @@ final class HostsManager: ObservableObject {
 
     /// 将 base 内容与所有启用方案的块组合后写入 /etc/hosts
     func writeComposedHosts() async {
-        isLoading = true
-        defer { isLoading = false }
-        let composed = composeHostsContent()
         do {
-            let verifiedContent = try await writeAndVerifyHosts(composed)
-            currentSystemContent = verifiedContent
-            errorMessage = nil
+            try await applyComposedHosts()
         } catch {
             handlePrivilegedOperationError(error, operation: "应用配置")
         }
@@ -331,6 +333,16 @@ final class HostsManager: ObservableObject {
 
     private func readSystemHostsContent() throws -> String {
         try String(contentsOfFile: "/etc/hosts", encoding: .utf8)
+    }
+
+    private func applyComposedHosts() async throws {
+        isLoading = true
+        defer { isLoading = false }
+
+        let composed = composeHostsContent()
+        let verifiedContent = try await writeAndVerifyHosts(composed)
+        currentSystemContent = verifiedContent
+        errorMessage = nil
     }
 
     private func writeAndVerifyHosts(_ content: String) async throws -> String {
