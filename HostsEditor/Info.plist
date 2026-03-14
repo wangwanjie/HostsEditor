@@ -14,9 +14,15 @@
 	<string>NSApplication</string>
 	<key>SUEnableAutomaticChecks</key>
 	<true/>
+	<key>SUEnableInstallerLauncherService</key>
+	<true/>
+	<key>SUEnableSystemProfiling</key>
+	<true/>
 	<key>SUFeedURL</key>
-	<string></string>
+	<string>https://raw.githubusercontent.com/wangwanjie/HostsEditor/main/appcast.xml</string>
 	<key>SUPublicEDKey</key>
-	<string></string>
+	<string>BzzVMvOjFJ40+dn0w5cLJcLHIHct+6OpLIoXawVAN28=</string>
+	<key>SUVerifyUpdateBeforeExtraction</key>
+	<true/>
 </dict>
 </plist>

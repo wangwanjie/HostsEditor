@@ -16,6 +16,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 DEFAULT_DMG_DIR="$PROJECT_DIR/build/dmg"
 PBXPROJ="$PROJECT_DIR/HostsEditor.xcodeproj/project.pbxproj"
+INFO_PLIST="$PROJECT_DIR/HostsEditor/Info.plist"
 
 DMG_PATH=""
 REPO=""
@@ -71,6 +72,11 @@ require_command() {
     fi
 }
 
+read_plist_string() {
+    local key="$1"
+    /usr/libexec/PlistBuddy -c "Print :$key" "$INFO_PLIST" 2>/dev/null || true
+}
+
 resolve_path() {
     local input_path="$1"
     local candidate="$input_path"
@@ -118,6 +124,13 @@ extract_github_repo_from_url() {
 detect_repo() {
     local remote_url
     local repo_name
+
+    if remote_url="$(read_plist_string "HostsEditorGitHubURL")"; then
+        if repo_name="$(extract_github_repo_from_url "$remote_url" 2>/dev/null)"; then
+            printf '%s\n' "$repo_name"
+            return 0
+        fi
+    fi
 
     if remote_url="$(git remote get-url origin_github 2>/dev/null)"; then
         if repo_name="$(extract_github_repo_from_url "$remote_url" 2>/dev/null)"; then
@@ -341,3 +354,14 @@ else
 fi
 
 echo "完成: https://github.com/$REPO/releases/tag/$TAG"
+
+APPCAST_NOTES="$(gh release view "$TAG" -R "$REPO" --json body --jq '.body // ""' 2>/dev/null || true)"
+APPCAST_ARGS=(--repo "$REPO" --archive "$DMG_PATH")
+if [[ -n "$APPCAST_NOTES" ]]; then
+    APPCAST_ARGS+=(--notes "$APPCAST_NOTES")
+fi
+
+"$PROJECT_DIR/scripts/generate_appcast.sh" "${APPCAST_ARGS[@]}"
+
+echo "appcast 已更新: $PROJECT_DIR/appcast.xml"
+echo "请将 appcast.xml 一并提交并推送到 GitHub 默认分支。"

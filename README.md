@@ -20,7 +20,7 @@
 - 菜单栏快速切换：通过状态栏图标快速启用或关闭方案
 - 语法高亮：对注释、IP、主机名进行高亮，支持浅色和深色外观
 - 原始内容保留：会保留系统 hosts 中不属于 HostsEditor 管理块的基础内容
-- 零第三方依赖：仅使用系统框架，无 SPM / CocoaPods 依赖
+- 自动更新：集成 Sparkle，可通过 appcast 分发新版本
 
 ## 适用场景
 
@@ -217,6 +217,42 @@ HostsEditor/
 └── scripts/publish_github_release.sh # GitHub Releases 上传脚本
 ```
 
+## 自动更新
+
+项目已接入 Sparkle，并使用以下配置：
+
+- appcast 地址：`https://raw.githubusercontent.com/wangwanjie/HostsEditor/main/appcast.xml`
+- Sparkle EdDSA Keychain account：`cn.vanjay.HostsEditor.sparkle`
+- `SUPublicEDKey` 已写入 `HostsEditor/Info.plist`
+
+首次在发布机器上配置 Sparkle 私钥：
+
+```bash
+<Sparkle bin>/generate_keys --account cn.vanjay.HostsEditor.sparkle
+```
+
+`Sparkle bin` 通常位于：
+
+```bash
+~/Library/Developer/Xcode/DerivedData/<DerivedData>/SourcePackages/artifacts/sparkle/Sparkle/bin
+```
+
+发布 GitHub Release 后，脚本会自动：
+
+1. 上传当前 DMG 到 GitHub Releases
+2. 把该 DMG 复制到本地 `build/appcast-archives/`
+3. 重新生成仓库根目录下的 `appcast.xml`
+
+命令：
+
+```bash
+./scripts/publish_github_release.sh --repo wangwanjie/HostsEditor
+```
+
+脚本执行完后，还需要把更新后的 `appcast.xml` 提交并推送到 GitHub 默认分支。
+
+如果要在 appcast 中保留多个历史版本，不要清空本地 `build/appcast-archives/` 目录；脚本会把每次发布过的 DMG 累积到这里，再据此生成多版本更新清单。
+
 ## 技术栈
 
 - Swift
@@ -226,3 +262,4 @@ HostsEditor/
 - ServiceManagement
 - Security
 - XPC
+- Sparkle
