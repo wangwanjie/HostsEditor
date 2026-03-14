@@ -29,6 +29,12 @@ extension Notification.Name {
 final class HostsManager: ObservableObject {
     static let shared = HostsManager()
 
+    private enum PendingPrivilegedOperation {
+        case writeSystemContent(String)
+        case writeComposedHosts
+        case setProfileEnabled(id: String, enabled: Bool)
+    }
+
     @Published private(set) var profiles: [HostsProfile] = []
     @Published private(set) var currentSystemContent: String = ""
     @Published private(set) var isLoading = false
@@ -40,6 +46,7 @@ final class HostsManager: ObservableObject {
 
     private let profilesKey = "HostsEditorProfiles"
     private let baseContentKey = "HostsEditorBaseContent"
+    private var pendingPrivilegedOperation: PendingPrivilegedOperation?
 
     /// 系统 hosts 中不属于任何方案的原始部分
     private(set) var baseSystemContent: String = ""
@@ -95,6 +102,7 @@ final class HostsManager: ObservableObject {
         } catch {
             profiles = previousProfiles
             saveProfiles()
+            queuePendingPrivilegedOperation(.setProfileEnabled(id: id, enabled: enabled), for: error)
             handlePrivilegedOperationError(error, operation: "应用配置")
         }
     }
@@ -126,8 +134,10 @@ final class HostsManager: ObservableObject {
             let base = Self.extractBaseContent(from: verifiedContent)
             baseSystemContent = base
             UserDefaults.standard.set(base, forKey: baseContentKey)
+            pendingPrivilegedOperation = nil
             errorMessage = nil
         } catch {
+            queuePendingPrivilegedOperation(.writeSystemContent(content), for: error)
             handlePrivilegedOperationError(error, operation: "写入系统 hosts")
         }
     }
@@ -139,6 +149,7 @@ final class HostsManager: ObservableObject {
         do {
             try await applyComposedHosts()
         } catch {
+            queuePendingPrivilegedOperation(.writeComposedHosts, for: error)
             handlePrivilegedOperationError(error, operation: "应用配置")
         }
     }
@@ -264,14 +275,32 @@ final class HostsManager: ObservableObject {
 
     func uninstallHelper() async throws {
         try await PrivilegedHostsWriter.shared.uninstallHelper()
+        pendingPrivilegedOperation = nil
     }
 
     func uninstallHelperAndWait() async throws {
         try await PrivilegedHostsWriter.shared.uninstallHelperAndWait()
+        pendingPrivilegedOperation = nil
     }
 
     func reinstallHelper() async throws {
         try await PrivilegedHostsWriter.shared.reinstallHelper()
+    }
+
+    func retryPendingPrivilegedOperationIfNeeded() async {
+        guard let pendingPrivilegedOperation else { return }
+
+        self.pendingPrivilegedOperation = nil
+        errorMessage = nil
+
+        switch pendingPrivilegedOperation {
+        case .writeSystemContent(let content):
+            await writeSystemContent(content)
+        case .writeComposedHosts:
+            await writeComposedHosts()
+        case .setProfileEnabled(let id, let enabled):
+            await setProfileEnabled(id: id, enabled: enabled)
+        }
     }
 
     var isHelperInstalled: Bool {
@@ -298,6 +327,11 @@ final class HostsManager: ObservableObject {
                 "operation": operation,
             ]
         )
+    }
+
+    private func queuePendingPrivilegedOperation(_ operation: PendingPrivilegedOperation, for error: Error) {
+        guard helperInterventionKind(for: error) != nil else { return }
+        pendingPrivilegedOperation = operation
     }
 
     private func helperInterventionKind(for error: Error) -> HelperInterventionKind? {
@@ -342,6 +376,7 @@ final class HostsManager: ObservableObject {
         let composed = composeHostsContent()
         let verifiedContent = try await writeAndVerifyHosts(composed)
         currentSystemContent = verifiedContent
+        pendingPrivilegedOperation = nil
         errorMessage = nil
     }
 

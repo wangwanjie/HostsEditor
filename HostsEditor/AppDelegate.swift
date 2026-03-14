@@ -15,6 +15,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusMenu: NSMenu?
     private var profileMenuItems: [NSMenuItem] = []
     private var isPresentingHelperInterventionAlert = false
+    private var shouldRetryPendingOperationAfterActivation = false
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         NotificationCenter.default.addObserver(
@@ -114,6 +115,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = nil
     }
 
+    func applicationDidBecomeActive(_ notification: Notification) {
+        guard shouldRetryPendingOperationAfterActivation else { return }
+
+        switch PrivilegedHostsWriter.shared.daemonStatus {
+        case .enabled:
+            shouldRetryPendingOperationAfterActivation = false
+            Task { @MainActor in
+                await HostsManager.shared.retryPendingPrivilegedOperationIfNeeded()
+            }
+        case .requiresApproval:
+            return
+        case .notRegistered, .notFound:
+            shouldRetryPendingOperationAfterActivation = false
+        @unknown default:
+            shouldRetryPendingOperationAfterActivation = false
+        }
+    }
+
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
         return true
     }
@@ -156,7 +175,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         alert.addButton(withTitle: "立即启用")
         alert.addButton(withTitle: "稍后")
         if alert.runModal() == .alertFirstButtonReturn {
-            performHelperSetup(forceRepair: false, announceSuccess: false)
+            performHelperSetup(
+                forceRepair: false,
+                announceSuccess: false,
+                retryPendingOperation: operation != nil
+            )
         }
     }
 
@@ -174,6 +197,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         alert.addButton(withTitle: "打开系统设置")
         alert.addButton(withTitle: "稍后")
         if alert.runModal() == .alertFirstButtonReturn {
+            shouldRetryPendingOperationAfterActivation = operation != nil
             SMAppService.openSystemSettingsLoginItems()
         }
     }
@@ -201,13 +225,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         alert.runModal()
     }
 
-    private func performHelperSetup(forceRepair: Bool, announceSuccess: Bool) {
+    private func performHelperSetup(forceRepair: Bool, announceSuccess: Bool, retryPendingOperation: Bool = false) {
         Task { @MainActor in
             do {
                 if forceRepair {
                     try await HostsManager.shared.reinstallHelper()
                 } else {
                     try await HostsManager.shared.enableHelper()
+                }
+
+                if retryPendingOperation {
+                    await HostsManager.shared.retryPendingPrivilegedOperationIfNeeded()
                 }
 
                 guard announceSuccess else { return }
@@ -284,7 +312,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 alert.addButton(withTitle: "重新启用")
                 alert.addButton(withTitle: "取消")
                 if alert.runModal() == .alertFirstButtonReturn {
-                    performHelperSetup(forceRepair: false, announceSuccess: false)
+                    performHelperSetup(forceRepair: false, announceSuccess: false, retryPendingOperation: true)
                 }
             } else {
                 presentHelperInstallAlert(operation: operation)
@@ -299,7 +327,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             alert.addButton(withTitle: "立即修复")
             alert.addButton(withTitle: "稍后")
             if alert.runModal() == .alertFirstButtonReturn {
-                performHelperSetup(forceRepair: true, announceSuccess: false)
+                performHelperSetup(forceRepair: true, announceSuccess: false, retryPendingOperation: true)
             }
         }
     }

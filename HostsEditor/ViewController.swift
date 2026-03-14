@@ -296,13 +296,20 @@ class ViewController: NSViewController {
             .sink { [weak self] content in
                 guard let self, case .system = self.selection else { return }
                 self.editorTextView.string = content
+                self.lastSyncedContent = content
                 self.editorTextView.setupSyntaxHighlighting()
+                self.updateButtonsForSelection()
             }
             .store(in: &cancellables)
 
         manager.$errorMessage
             .receive(on: DispatchQueue.main)
             .sink { [weak self] msg in self?.errorLabel.stringValue = msg ?? "" }
+            .store(in: &cancellables)
+
+        manager.$isLoading
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.updateButtonsForSelection() }
             .store(in: &cancellables)
     }
 
@@ -345,7 +352,7 @@ class ViewController: NSViewController {
     private func updateButtonsForSelection() {
         let canSave: Bool
         switch selection { case .system, .profile: canSave = true; case .base: canSave = false }
-        applyButton.isEnabled = canSave && isContentDirty
+        applyButton.isEnabled = canSave && isContentDirty && !manager.isLoading
         let isDeletableProfile: Bool
         if case .profile = selection { isDeletableProfile = true } else { isDeletableProfile = false }
         removeProfileButton.isEnabled = isDeletableProfile
@@ -462,7 +469,6 @@ class ViewController: NSViewController {
     @objc private func saveAndApply() {
         switch selection {
         case .system:
-            lastSyncedContent = editorTextView.string
             Task { await manager.writeSystemContent(editorTextView.string) }
             updateButtonsForSelection()
         case .base:
