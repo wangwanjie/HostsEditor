@@ -133,21 +133,23 @@ HostsEditor 不会粗暴覆盖整个 `/etc/hosts`。
 
 ### 出现 “couldn’t communicate with a helper application”
 
-通常是因为系统里残留了旧版本 Helper，或者之前用不同 Team 构建过该应用，导致签名不一致。
+通常是因为系统里残留了旧版本后台任务记录，或者之前用不同 Team 构建过该应用，导致签名不一致。
 
-先卸载旧 Helper：
+先退出 HostsEditor，然后清理旧记录：
 
 ```bash
-sudo launchctl unload /Library/LaunchDaemons/cn.vanjay.HostsEditor.Helper.plist 2>/dev/null
-sudo rm -f /Library/LaunchDaemons/cn.vanjay.HostsEditor.Helper.plist
-sudo rm -f /Library/PrivilegedHelperTools/cn.vanjay.HostsEditor.Helper
+sudo launchctl bootout system/cn.vanjay.HostsEditor.Helper 2>/dev/null || true
+sudo launchctl bootout system/cn.vanjay.HostsEditorHelper 2>/dev/null || true
+sfltool dumpbtm | rg 'HostsEditor|cn\\.vanjay'
 ```
 
 然后执行：
 
 1. 在 Xcode 中 `Clean Build Folder`
-2. 重新运行应用
-3. 再次触发一次系统 hosts 的读取或写入
+2. 确认 `/Applications`、`~/Applications` 里没有旧的 `HostsEditor.app`
+3. 重新运行当前构建
+4. 在应用里点击一次“启用或修复后台帮助程序”
+5. 再次触发一次系统 hosts 的读取或写入
 
 ### 提示“需要允许后台程序”
 

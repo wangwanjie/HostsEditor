@@ -297,6 +297,8 @@ final class HostsManager: ObservableObject {
                 return .approval
             case .registrationFailed:
                 return .install
+            case .repairRequired:
+                return .repair
             case .connectionFailed:
                 return .repair
             case .timeout:

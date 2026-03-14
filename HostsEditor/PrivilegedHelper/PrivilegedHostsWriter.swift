@@ -8,14 +8,15 @@
 import Foundation
 import ServiceManagement
 
-private let helperLabel = "cn.vanjay.HostsEditor.Helper"
-private let daemonPlistName = "cn.vanjay.HostsEditor.Helper.plist"
-private let helperProgramIdentifier = "Contents/MacOS/cn.vanjay.HostsEditor.Helper"
-private let legacyHelperProgramIdentifier = "Contents/Library/LaunchServices/cn.vanjay.HostsEditor.Helper"
+private let helperLabel = "cn.vanjay.HostsEditorHelper"
+private let daemonPlistName = "cn.vanjay.HostsEditorHelper.plist"
+private let helperExecutableName = "HostsEditorHelper"
+private let helperProgramIdentifier = "Contents/MacOS/\(helperExecutableName)"
 
 enum PrivilegedHostsError: Error, LocalizedError {
     case requiresApproval
     case registrationFailed(String)
+    case repairRequired(String)
     case connectionFailed
     case timeout
 
@@ -25,6 +26,8 @@ enum PrivilegedHostsError: Error, LocalizedError {
             return "需要在“系统设置 -> 通用 -> 登录项与扩展程序”中允许后台帮助程序"
         case .registrationFailed(let message):
             return message.isEmpty ? "后台帮助程序注册失败" : message
+        case .repairRequired(let message):
+            return message.isEmpty ? "后台帮助程序需要修复" : message
         case .connectionFailed:
             return "无法连接帮助程序"
         case .timeout:
@@ -48,24 +51,20 @@ private struct HelperLaunchdState {
         rawOutput.contains("job state = spawn failed") || rawOutput.contains("last exit code = 78: EX_CONFIG")
     }
 
-    var usesLegacyProgramIdentifier: Bool {
-        programIdentifier == legacyHelperProgramIdentifier
-    }
-
     var shouldForceRepair: Bool {
-        needsLWCRUpdate || usesLegacyProgramIdentifier || isSpawnFailed
+        needsLWCRUpdate || programIdentifier != helperProgramIdentifier || isSpawnFailed
     }
 
     var recoveryMessage: String {
-        if usesLegacyProgramIdentifier {
-            return "系统当前仍保留着旧版后台帮助程序路径，HostsEditor 将重新注册帮助程序。若你刚删除过旧版应用，请重新打开当前构建后再点一次“启用或修复后台帮助程序”。"
+        if let programIdentifier, programIdentifier != helperProgramIdentifier {
+            return "系统当前记录的后台帮助程序路径与当前安装包不一致。请先清理旧登录项或后台任务记录，再重新运行当前构建后点击“启用或修复后台帮助程序”。"
         }
 
         if needsLWCRUpdate {
-            return "macOS 仍在使用旧的后台任务注册记录，HostsEditor 将重新注册帮助程序。若问题仍然存在，请在“帮助”菜单中先停用后台帮助程序，再重新启用。"
+            return "macOS 仍在使用旧的后台任务注册记录。请先停用后台帮助程序，再重新启用；若仍失败，请清理旧登录项/后台任务记录后重试。"
         }
 
-        return "后台帮助程序已注册，但 macOS 拉起该进程时仍然失败，HostsEditor 将重新注册帮助程序。"
+        return "后台帮助程序已注册，但 macOS 拉起该进程时仍然失败。请在“帮助”菜单中手动执行一次“启用或修复后台帮助程序”。"
     }
 
     private func value(after prefix: String) -> String? {
@@ -109,12 +108,8 @@ final class PrivilegedHostsWriter {
 
     func needsRepairAfterLaunch() async -> Bool {
         guard daemonStatus == .enabled else { return false }
-
-        if let state = await currentLaunchdState(), state.shouldForceRepair {
-            return true
-        }
-
-        return !(await isHelperReachable())
+        guard let state = await currentLaunchdState() else { return false }
+        return state.shouldForceRepair
     }
 
     func installHelperIfNeeded() async throws {
@@ -216,16 +211,16 @@ final class PrivilegedHostsWriter {
         case .enabled:
             let launchdState = await currentLaunchdState()
 
-            if !forceRepair {
-                if let launchdState, launchdState.shouldForceRepair {
-                    try await repairRegisteredHelper()
-                } else if await isHelperReachable() {
-                    return
-                } else {
-                    try await repairRegisteredHelper()
-                }
-            } else {
+            if forceRepair {
                 try await repairRegisteredHelper()
+            } else {
+                if let launchdState, launchdState.shouldForceRepair {
+                    throw PrivilegedHostsError.repairRequired(launchdState.recoveryMessage)
+                }
+
+                if await waitForHelperReachable() {
+                    return
+                }
             }
         case .notRegistered, .notFound:
             try registerHelper()
@@ -245,7 +240,7 @@ final class PrivilegedHostsWriter {
 
         guard await waitForHelperReachable() else {
             if let launchdState = await currentLaunchdState(), launchdState.shouldForceRepair {
-                throw PrivilegedHostsError.registrationFailed(launchdState.recoveryMessage)
+                throw PrivilegedHostsError.repairRequired(launchdState.recoveryMessage)
             }
             throw PrivilegedHostsError.connectionFailed
         }
@@ -298,7 +293,7 @@ final class PrivilegedHostsWriter {
         try registerHelper()
     }
 
-    private func waitForHelperReachable(attempts: Int = 8) async -> Bool {
+    private func waitForHelperReachable(attempts: Int = 20) async -> Bool {
         for attempt in 0..<attempts {
             if await isHelperReachable() {
                 return true
@@ -368,7 +363,7 @@ final class PrivilegedHostsWriter {
     private static nonisolated func readLaunchdState() -> HelperLaunchdState? {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
-        process.arguments = ["print", "system/cn.vanjay.HostsEditor.Helper"]
+        process.arguments = ["print", "system/cn.vanjay.HostsEditorHelper"]
 
         let outputPipe = Pipe()
         process.standardOutput = outputPipe

@@ -128,10 +128,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func promptForHelperIfNeeded() {
         switch PrivilegedHostsWriter.shared.daemonStatus {
         case .enabled:
-            Task { @MainActor in
-                guard await PrivilegedHostsWriter.shared.needsRepairAfterLaunch() else { return }
-                performHelperSetup(forceRepair: true, announceSuccess: false)
-            }
             return
         case .notRegistered, .notFound:
             presentHelperInstallAlert(operation: nil)
@@ -180,10 +176,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func showHelperInstallError(_ err: Error) {
         let alert = NSAlert()
-        if let privilegedError = err as? PrivilegedHostsError,
-           case .registrationFailed(let message) = privilegedError {
-            alert.messageText = "启用后台帮助程序失败"
-            alert.informativeText = message
+        if let privilegedError = err as? PrivilegedHostsError {
+            switch privilegedError {
+            case .registrationFailed(let message):
+                alert.messageText = "启用后台帮助程序失败"
+                alert.informativeText = message
+            case .repairRequired(let message):
+                alert.messageText = "后台帮助程序需要修复"
+                alert.informativeText = message
+            default:
+                alert.messageText = "启用后台帮助程序失败"
+                alert.informativeText = err.localizedDescription
+            }
         } else {
             alert.messageText = "启用后台帮助程序失败"
             alert.informativeText = err.localizedDescription
@@ -213,7 +217,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 switch privilegedError {
                 case .requiresApproval:
                     presentHelperApprovalAlert(operation: nil)
-                case .registrationFailed, .connectionFailed, .timeout:
+                case .registrationFailed, .repairRequired, .connectionFailed, .timeout:
                     showHelperInstallError(privilegedError)
                 }
             } catch {
@@ -274,7 +278,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         case .repair:
             let alert = NSAlert()
             alert.messageText = "需要修复后台帮助程序"
-            alert.informativeText = "要\(operation)，HostsEditor 需要重新注册后台帮助程序。通常这是应用更新后 helper 可执行文件变更导致的，修复后不需要再次重复授权。"
+            alert.informativeText = "要\(operation)，HostsEditor 需要重新注册后台帮助程序。全新安装并已允许后，后续读写 hosts 不应再次授权；如果你之前装过旧版本，请先清理旧登录项或后台任务记录后再修复。"
             alert.alertStyle = .warning
             alert.addButton(withTitle: "立即修复")
             alert.addButton(withTitle: "稍后")
