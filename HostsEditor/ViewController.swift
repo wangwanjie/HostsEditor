@@ -8,14 +8,31 @@
 import Cocoa
 import Combine
 
+protocol ProfileTableViewContextMenuDelegate: AnyObject {
+    func tableView(_ tableView: ProfileTableView, menuForRow row: Int) -> NSMenu?
+}
+
+final class ProfileTableView: NSTableView {
+    weak var contextMenuDelegate: ProfileTableViewContextMenuDelegate?
+
+    override func menu(for event: NSEvent) -> NSMenu? {
+        let point = convert(event.locationInWindow, from: nil)
+        let row = row(at: point)
+        guard row >= 0 else { return nil }
+        return contextMenuDelegate?.tableView(self, menuForRow: row)
+    }
+}
+
 class ViewController: NSViewController {
+
+    private static let mainWindowFrameAutosaveName = NSWindow.FrameAutosaveName("HostsEditorMainWindowFrame")
 
     private let manager = HostsManager.shared
     private var cancellables = Set<AnyCancellable>()
 
     private var splitView: NSSplitView!
     private var sidebarScroll: NSScrollView!
-    private var profileTableView: NSTableView!
+    private var profileTableView: ProfileTableView!
     private var editorScroll: NSScrollView!
     private var editorTextView: HostsEditorTextView!
     private var addProfileButton: NSButton!
@@ -132,10 +149,11 @@ class ViewController: NSViewController {
     }
 
     private var didSetSplitPosition = false
+    private var didConfigureWindowFrameAutosave = false
 
     override func viewDidAppear() {
         super.viewDidAppear()
-        view.window?.minSize = NSSize(width: 800, height: 500)
+        configureWindowIfNeeded()
         if profileTableView.selectedRow < 0 {
             profileTableView.selectRowIndexes(IndexSet(integer: systemRow), byExtendingSelection: false)
             selection = .system
@@ -150,6 +168,20 @@ class ViewController: NSViewController {
         guard !didSetSplitPosition, splitView.subviews.count >= 2, splitView.bounds.width > 300 else { return }
         splitView.setPosition(220, ofDividerAt: 0)
         didSetSplitPosition = true
+    }
+
+    private func configureWindowIfNeeded() {
+        guard let window = view.window else { return }
+        window.minSize = NSSize(width: 800, height: 500)
+        guard !didConfigureWindowFrameAutosave else { return }
+        didConfigureWindowFrameAutosave = true
+
+        let restored = window.setFrameUsingName(Self.mainWindowFrameAutosaveName)
+        _ = window.setFrameAutosaveName(Self.mainWindowFrameAutosaveName)
+        if !restored {
+            window.setContentSize(NSSize(width: 1040, height: 680))
+            window.center()
+        }
     }
 
     // MARK: - UI Build
@@ -182,12 +214,13 @@ class ViewController: NSViewController {
         col.title = "方案"
         col.width = 200
 
-        profileTableView = NSTableView()
+        profileTableView = ProfileTableView()
         profileTableView.addTableColumn(col)
         profileTableView.headerView = nil
         profileTableView.rowHeight = 28
         profileTableView.delegate = self
         profileTableView.dataSource = self
+        profileTableView.contextMenuDelegate = self
         profileTableView.allowsEmptySelection = true
         profileTableView.allowsMultipleSelection = false
         profileTableView.identifier = NSUserInterfaceItemIdentifier("Profiles")
@@ -461,6 +494,21 @@ class ViewController: NSViewController {
         }
     }
 
+    @objc private func toggleProfileEnabledFromContextMenu(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? String,
+              let profile = manager.profile(for: id) else { return }
+        Task { await manager.setProfileEnabled(id: id, enabled: !profile.isEnabled) }
+    }
+
+    @objc private func removeProfileFromContextMenu(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? String else { return }
+        let targetRow = row(for: .profile(id))
+        guard targetRow >= 0 else { return }
+        profileTableView.selectRowIndexes(IndexSet(integer: targetRow), byExtendingSelection: false)
+        selection = .profile(id)
+        removeProfile()
+    }
+
     deinit {
         if let m = keyMonitor { NSEvent.removeMonitor(m) }
     }
@@ -635,5 +683,34 @@ extension ViewController: NSSplitViewDelegate {
 
     func splitView(_ splitView: NSSplitView, constrainMaxCoordinate proposedMaximumPosition: CGFloat, ofSubviewAt index: Int) -> CGFloat {
         return index == 0 ? max(120, splitView.bounds.width - 150) : proposedMaximumPosition
+    }
+}
+
+extension ViewController: ProfileTableViewContextMenuDelegate {
+    func tableView(_ tableView: ProfileTableView, menuForRow row: Int) -> NSMenu? {
+        guard let rowSelection = selection(forRow: row),
+              case .profile(let id) = rowSelection,
+              let profile = manager.profile(for: id) else { return nil }
+
+        if tableView.selectedRow != row {
+            tableView.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
+        }
+
+        let menu = NSMenu()
+
+        let toggleTitle = profile.isEnabled ? "停用" : "启用"
+        let toggleItem = NSMenuItem(title: toggleTitle, action: #selector(toggleProfileEnabledFromContextMenu(_:)), keyEquivalent: "")
+        toggleItem.target = self
+        toggleItem.representedObject = id
+        menu.addItem(toggleItem)
+
+        menu.addItem(NSMenuItem.separator())
+
+        let deleteItem = NSMenuItem(title: "删除", action: #selector(removeProfileFromContextMenu(_:)), keyEquivalent: "")
+        deleteItem.target = self
+        deleteItem.representedObject = id
+        menu.addItem(deleteItem)
+
+        return menu
     }
 }
