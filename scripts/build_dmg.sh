@@ -338,7 +338,7 @@ if [[ ! -d "$APP_PATH" ]]; then
     exit 1
 fi
 
-HELPER_PATH="$APP_PATH/Contents/Library/LaunchServices/cn.vanjay.HostsEditor.Helper"
+HELPER_PATH="$APP_PATH/Contents/MacOS/HostsEditorHelper"
 SIGNING_AUTHORITY="$(current_signing_authority "$APP_PATH")"
 if [[ -z "$SIGNING_AUTHORITY" ]]; then
     echo "错误: 未能从构建产物识别 Developer ID Application 签名身份" >&2
@@ -347,7 +347,7 @@ fi
 
 resign_for_notarization "$SIGNING_AUTHORITY"
 verify_signature "$APP_PATH" "HostsEditor.app"
-verify_signature "$HELPER_PATH" "cn.vanjay.HostsEditor.Helper"
+verify_signature "$HELPER_PATH" "HostsEditorHelper"
 
 # 准备 DMG 输出目录
 mkdir -p "$DMG_OUTPUT_DIR"

@@ -3,12 +3,12 @@
 <plist version="1.0">
 <dict>
 	<key>Label</key>
-	<string>cn.vanjay.HostsEditor.Helper</string>
+	<string>cn.vanjay.HostsEditorHelper</string>
 	<key>BundleProgram</key>
-	<string>Contents/MacOS/cn.vanjay.HostsEditor.Helper</string>
+	<string>Contents/MacOS/HostsEditorHelper</string>
 	<key>MachServices</key>
 	<dict>
-		<key>cn.vanjay.HostsEditor.Helper</key>
+		<key>cn.vanjay.HostsEditorHelper</key>
 		<true/>
 	</dict>
 </dict>
