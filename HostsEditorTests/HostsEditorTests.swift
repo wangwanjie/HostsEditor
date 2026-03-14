@@ -10,8 +10,16 @@ import Testing
 
 struct HostsEditorTests {
 
-    @Test func example() async throws {
-        // Write your test here and use APIs like `#expect(...)` to check expected conditions.
+    @Test func releaseVersionIgnoresLeadingVAndTrailingZeros() async throws {
+        #expect(ReleaseVersion("v1.0") == ReleaseVersion("1.0.0"))
+    }
+
+    @Test func releaseVersionComparesNumericComponents() async throws {
+        #expect(ReleaseVersion("1.2.10") > ReleaseVersion("1.2.9"))
+    }
+
+    @Test func releaseVersionHandlesPreReleaseSuffixes() async throws {
+        #expect(ReleaseVersion("v2.0.0-beta.1") == ReleaseVersion("2.0"))
     }
 
 }
