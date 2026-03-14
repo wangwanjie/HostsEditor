@@ -6,6 +6,7 @@
 import AppKit
 import Combine
 import SnapKit
+import ServiceManagement
 
 @MainActor
 final class PreferencesWindowController: NSWindowController {
@@ -50,6 +51,7 @@ private final class PreferencesViewController: NSViewController {
     private enum PreferencesSection: Int, CaseIterable {
         case updates
         case editor
+        case helper
 
         var title: String {
             switch self {
@@ -57,6 +59,8 @@ private final class PreferencesViewController: NSViewController {
                 return "更新"
             case .editor:
                 return "编辑器"
+            case .helper:
+                return "帮助程序"
             }
         }
     }
@@ -68,12 +72,16 @@ private final class PreferencesViewController: NSViewController {
     private var sectionControl: NSSegmentedControl!
     private var updatesSectionView: NSView!
     private var editorSectionView: NSView!
+    private var helperSectionView: NSView!
     private var updateStrategyPopup: NSPopUpButton!
     private var automaticDownloadsCheckbox: NSButton!
     private var automaticDownloadsHintLabel: NSTextField!
     private var fontSizeSlider: NSSlider!
     private var fontSizeStepper: NSStepper!
     private var fontSizeValueLabel: NSTextField!
+    private var helperStatusLabel: NSTextField!
+    private var helperDetailLabel: NSTextField!
+    private var disableHelperButton: NSButton!
 
     override func loadView() {
         view = NSView()
@@ -84,6 +92,7 @@ private final class PreferencesViewController: NSViewController {
         super.viewDidLoad()
         bindSettings()
         syncControlsFromSettings()
+        syncHelperControls()
         syncVisibleSection()
     }
 
@@ -107,7 +116,12 @@ private final class PreferencesViewController: NSViewController {
             makeLabeledRow(title: "Hosts 字体大小", control: makeFontSizeControl()),
         ])
 
-        let rootStack = NSStackView(views: [sectionControl, updatesSectionView, editorSectionView])
+        helperSectionView = makeSectionCard(contentViews: [
+            makeLabeledRow(title: "当前状态", control: makeHelperStatusView()),
+            helperActionsRow(),
+        ])
+
+        let rootStack = NSStackView(views: [sectionControl, updatesSectionView, editorSectionView, helperSectionView])
         rootStack.orientation = .vertical
         rootStack.alignment = .leading
         rootStack.spacing = 18
@@ -130,6 +144,10 @@ private final class PreferencesViewController: NSViewController {
         editorSectionView.snp.makeConstraints { make in
             make.width.equalTo(rootStack)
         }
+
+        helperSectionView.snp.makeConstraints { make in
+            make.width.equalTo(rootStack)
+        }
     }
 
     private func bindSettings() {
@@ -138,6 +156,13 @@ private final class PreferencesViewController: NSViewController {
             .receive(on: RunLoop.main)
             .sink { [weak self] _, _ in
                 self?.syncControlsFromSettings()
+            }
+            .store(in: &cancellables)
+
+        NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.syncHelperControls()
             }
             .store(in: &cancellables)
     }
@@ -167,10 +192,37 @@ private final class PreferencesViewController: NSViewController {
         }
     }
 
+    private func syncHelperControls() {
+        let status = PrivilegedHostsWriter.shared.daemonStatus
+
+        if HostsManager.shared.isHelperExplicitlyDisabled {
+            helperStatusLabel.stringValue = "已停用"
+            helperDetailLabel.stringValue = "后台帮助程序被手动停用。重新启用后才能继续写入系统 hosts。"
+        } else {
+            switch status {
+            case .enabled:
+                helperStatusLabel.stringValue = "已启用"
+                helperDetailLabel.stringValue = "后台帮助程序可用。保持允许状态时，后续读写 hosts 不应再次请求授权。"
+            case .requiresApproval:
+                helperStatusLabel.stringValue = "等待系统允许"
+                helperDetailLabel.stringValue = "请前往“系统设置 -> 通用 -> 登录项与扩展程序”允许 HostsEditor 的后台帮助程序。"
+            case .notRegistered, .notFound:
+                helperStatusLabel.stringValue = "未启用"
+                helperDetailLabel.stringValue = "首次启用时会要求系统注册后台帮助程序；启用成功后才能写入 /etc/hosts。"
+            @unknown default:
+                helperStatusLabel.stringValue = "未知状态"
+                helperDetailLabel.stringValue = "检测到未知的后台帮助程序状态，可尝试执行一次“启用或修复后台帮助程序”。"
+            }
+        }
+
+        disableHelperButton.isEnabled = HostsManager.shared.hasRegisteredHelper
+    }
+
     private func syncVisibleSection() {
         sectionControl.selectedSegment = currentSection.rawValue
         updatesSectionView.isHidden = currentSection != .updates
         editorSectionView.isHidden = currentSection != .editor
+        helperSectionView.isHidden = currentSection != .helper
     }
 
     private func makeSectionCard(contentViews: [NSView]) -> NSView {
@@ -285,6 +337,41 @@ private final class PreferencesViewController: NSViewController {
         return row
     }
 
+    private func makeHelperStatusView() -> NSView {
+        helperStatusLabel = NSTextField(labelWithString: "")
+        helperStatusLabel.font = .systemFont(ofSize: 13, weight: .semibold)
+
+        helperDetailLabel = NSTextField(wrappingLabelWithString: "")
+        helperDetailLabel.textColor = .secondaryLabelColor
+        helperDetailLabel.maximumNumberOfLines = 3
+        helperDetailLabel.snp.makeConstraints { make in
+            make.width.lessThanOrEqualTo(440)
+        }
+
+        let stack = NSStackView(views: [helperStatusLabel, helperDetailLabel])
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 6
+        return stack
+    }
+
+    private func helperActionsRow() -> NSView {
+        let repairButton = NSButton(title: "启用或修复后台帮助程序", target: self, action: #selector(repairHelper))
+        repairButton.bezelStyle = .rounded
+
+        disableHelperButton = NSButton(title: "停用后台帮助程序", target: self, action: #selector(disableHelper))
+        disableHelperButton.bezelStyle = .rounded
+
+        let openSettingsButton = NSButton(title: "打开登录项设置", target: self, action: #selector(openHelperSettings))
+        openSettingsButton.bezelStyle = .rounded
+
+        let row = NSStackView(views: [repairButton, disableHelperButton, openSettingsButton])
+        row.orientation = .horizontal
+        row.alignment = .centerY
+        row.spacing = 10
+        return row
+    }
+
     @objc private func sectionChanged(_ sender: NSSegmentedControl) {
         guard let section = PreferencesSection(rawValue: sender.selectedSegment) else { return }
         currentSection = section
@@ -303,20 +390,109 @@ private final class PreferencesViewController: NSViewController {
     }
 
     @objc private func fontSizeSliderChanged(_ sender: NSSlider) {
-        settings.editorFontSize = sender.doubleValue
+        applyEditorFontSizeSelection(sender.doubleValue)
     }
 
     @objc private func fontSizeStepperChanged(_ sender: NSStepper) {
-        settings.editorFontSize = sender.doubleValue
+        applyEditorFontSizeSelection(sender.doubleValue)
     }
 
     @objc private func checkForUpdates() {
         UpdateManager.shared.checkForUpdates()
     }
 
+    @objc private func repairHelper() {
+        Task { @MainActor in
+            do {
+                try await HostsManager.shared.reinstallHelper()
+                syncHelperControls()
+                presentInfoAlert(
+                    title: "后台帮助程序已就绪",
+                    message: "现在可以继续写入系统 hosts 文件。后续只要该后台帮助程序保持允许状态，就不需要再次授权。"
+                )
+            } catch let privilegedError as PrivilegedHostsError {
+                handleHelperActionError(privilegedError)
+            } catch {
+                presentWarningAlert(title: "启用后台帮助程序失败", message: error.localizedDescription)
+            }
+        }
+    }
+
+    @objc private func disableHelper() {
+        let alert = NSAlert()
+        alert.messageText = "停用后台帮助程序"
+        alert.informativeText = "停用后将无法直接写入系统 hosts，直到重新启用。"
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "停用")
+        alert.addButton(withTitle: "取消")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+
+        Task { @MainActor in
+            do {
+                try await HostsManager.shared.uninstallHelperAndWait()
+                syncHelperControls()
+                presentInfoAlert(title: "后台帮助程序已停用", message: "如需继续编辑系统 hosts，可在此页面重新启用。")
+            } catch {
+                presentWarningAlert(title: "停用后台帮助程序失败", message: error.localizedDescription)
+            }
+        }
+    }
+
+    @objc private func openHelperSettings() {
+        SMAppService.openSystemSettingsLoginItems()
+    }
+
     @objc private func resetSettings() {
         settings.resetToDefaults()
         UpdateManager.shared.automaticallyDownloadsUpdates = false
         syncControlsFromSettings()
+    }
+
+    private func applyEditorFontSizeSelection(_ rawValue: Double) {
+        let sanitized = AppSettings.clampedEditorFontSize(rawValue)
+        fontSizeSlider.doubleValue = sanitized
+        fontSizeStepper.doubleValue = sanitized
+        fontSizeValueLabel.stringValue = "\(Int(sanitized)) pt"
+        settings.editorFontSize = sanitized
+    }
+
+    private func handleHelperActionError(_ error: PrivilegedHostsError) {
+        switch error {
+        case .requiresApproval:
+            let alert = NSAlert()
+            alert.messageText = "需要允许后台帮助程序"
+            alert.informativeText = "请前往“系统设置 -> 通用 -> 登录项与扩展程序”允许 HostsEditor 的后台帮助程序。开启后返回应用即可继续，无需再次授权。"
+            alert.alertStyle = .informational
+            alert.addButton(withTitle: "打开系统设置")
+            alert.addButton(withTitle: "取消")
+            if alert.runModal() == .alertFirstButtonReturn {
+                SMAppService.openSystemSettingsLoginItems()
+            }
+        case .registrationFailed(let message):
+            presentWarningAlert(title: "启用后台帮助程序失败", message: message)
+        case .repairRequired(let message):
+            presentWarningAlert(title: "后台帮助程序需要修复", message: message)
+        default:
+            presentWarningAlert(title: "启用后台帮助程序失败", message: error.localizedDescription)
+        }
+        syncHelperControls()
+    }
+
+    private func presentInfoAlert(title: String, message: String) {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = message
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "确定")
+        alert.runModal()
+    }
+
+    private func presentWarningAlert(title: String, message: String) {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = message
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "确定")
+        alert.runModal()
     }
 }

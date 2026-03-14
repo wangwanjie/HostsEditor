@@ -205,7 +205,7 @@ class ViewController: NSViewController {
     }
 
     private func buildSidebar() -> NSView {
-        let sidebar = NSView()
+        let sidebar = NSView(frame: NSRect(x: 0, y: 0, width: 220, height: max(view.bounds.height, 320)))
         sidebar.wantsLayer = true
 
         let col = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("Profile"))
@@ -232,30 +232,31 @@ class ViewController: NSViewController {
 
         addProfileButton = NSButton(title: "新建", target: self, action: #selector(showNewProfileMenu))
         addProfileButton.bezelStyle = .rounded
+        sidebar.addSubview(addProfileButton)
 
         removeProfileButton = NSButton(title: "删除", target: self, action: #selector(removeProfile))
         removeProfileButton.bezelStyle = .rounded
-
-        let buttonStack = NSStackView(views: [addProfileButton, removeProfileButton])
-        buttonStack.orientation = .vertical
-        buttonStack.alignment = .leading
-        buttonStack.spacing = 4
-        sidebar.addSubview(buttonStack)
+        sidebar.addSubview(removeProfileButton)
 
         sidebarScroll.snp.makeConstraints { make in
             make.top.leading.trailing.equalToSuperview().inset(8)
-            make.bottom.equalTo(buttonStack.snp.top).offset(-8)
+            make.bottom.equalTo(addProfileButton.snp.top).offset(-8)
         }
 
-        buttonStack.snp.makeConstraints { make in
-            make.leading.bottom.equalToSuperview().inset(8)
-            make.trailing.lessThanOrEqualToSuperview().inset(8)
+        addProfileButton.snp.makeConstraints { make in
+            make.leading.equalToSuperview().inset(8)
+            make.bottom.equalTo(removeProfileButton.snp.top).offset(-4)
+        }
+
+        removeProfileButton.snp.makeConstraints { make in
+            make.leading.equalToSuperview().inset(8)
+            make.bottom.equalToSuperview().inset(8)
         }
         return sidebar
     }
 
     private func buildEditorSection() -> NSView {
-        let right = NSView()
+        let right = NSView(frame: NSRect(x: 0, y: 0, width: max(view.bounds.width - 220, 320), height: max(view.bounds.height, 320)))
         right.wantsLayer = true
 
         editorTextView = HostsEditorTextView()
@@ -276,18 +277,15 @@ class ViewController: NSViewController {
         applyButton = NSButton(title: "保存并应用", target: self, action: #selector(saveAndApply))
         applyButton.bezelStyle = .rounded
         applyButton.keyEquivalent = "\r"
+        right.addSubview(applyButton)
 
         refreshButton = NSButton(title: "刷新", target: self, action: #selector(refreshCurrentHosts))
         refreshButton.bezelStyle = .rounded
+        right.addSubview(refreshButton)
 
         refreshRemoteButton = NSButton(title: "刷新远程", target: self, action: #selector(refreshRemote))
         refreshRemoteButton.bezelStyle = .rounded
-
-        let actionStack = NSStackView(views: [applyButton, refreshButton, refreshRemoteButton])
-        actionStack.orientation = .horizontal
-        actionStack.alignment = .centerY
-        actionStack.spacing = 8
-        right.addSubview(actionStack)
+        right.addSubview(refreshRemoteButton)
 
         errorLabel = NSTextField(labelWithString: "")
         errorLabel.textColor = .systemRed
@@ -296,12 +294,22 @@ class ViewController: NSViewController {
 
         editorScroll.snp.makeConstraints { make in
             make.top.leading.trailing.equalToSuperview().inset(8)
-            make.bottom.equalTo(actionStack.snp.top).offset(-8)
+            make.bottom.equalTo(applyButton.snp.top).offset(-8)
         }
 
-        actionStack.snp.makeConstraints { make in
+        applyButton.snp.makeConstraints { make in
             make.leading.equalToSuperview().inset(8)
             make.bottom.equalTo(errorLabel.snp.top).offset(-4)
+        }
+
+        refreshButton.snp.makeConstraints { make in
+            make.leading.equalTo(applyButton.snp.trailing).offset(8)
+            make.centerY.equalTo(applyButton)
+        }
+
+        refreshRemoteButton.snp.makeConstraints { make in
+            make.leading.equalTo(refreshButton.snp.trailing).offset(8)
+            make.centerY.equalTo(applyButton)
         }
 
         errorLabel.snp.makeConstraints { make in

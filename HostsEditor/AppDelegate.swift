@@ -145,6 +145,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return false
     }
 
+    func applicationShouldSaveApplicationState(_ app: NSApplication) -> Bool {
+        return false
+    }
+
     // MARK: - 帮助程序安装
 
     private func promptForHelperIfNeeded() {
