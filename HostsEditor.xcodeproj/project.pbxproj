@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		955DC8012F5E5C0000A34B51 /* HostsEditorHelper in Embed Helper */ = {isa = PBXBuildFile; fileRef = 955DC8002F5E5C0000A34B51 /* HostsEditorHelper */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		955DCA802F5E680000A34B51 /* cn.vanjay.HostsEditorHelper.plist in Copy LaunchDaemon Plist */ = {isa = PBXBuildFile; fileRef = 955DCA7F2F5E680000A34B51 /* cn.vanjay.HostsEditorHelper.plist */; };
+		A1B2C3D42F6A000000A34B51 /* SnapKit in Frameworks */ = {isa = PBXBuildFile; productRef = A1B2C3D62F6A000000A34B51 /* SnapKit */; };
 		C01E9FDAB4E7D97B06326737 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 01AF1926754AF7C59AE59BA3 /* Sparkle */; };
 /* End PBXBuildFile section */
 
@@ -111,6 +112,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A1B2C3D42F6A000000A34B51 /* SnapKit in Frameworks */,
 				C01E9FDAB4E7D97B06326737 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -193,6 +195,7 @@
 			);
 			name = HostsEditor;
 			packageProductDependencies = (
+				A1B2C3D62F6A000000A34B51 /* SnapKit */,
 				01AF1926754AF7C59AE59BA3 /* Sparkle */,
 			);
 			productName = HostsEditor;
@@ -294,6 +297,7 @@
 			mainGroup = 955DC7A32F5E5B9700A34B51;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				A1B2C3D52F6A000000A34B51 /* XCRemoteSwiftPackageReference "SnapKit" */,
 				DCA1CFE03F952840914E5D99 /* XCRemoteSwiftPackageReference "Sparkle" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -787,6 +791,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		A1B2C3D52F6A000000A34B51 /* XCRemoteSwiftPackageReference "SnapKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/SnapKit/SnapKit.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.7.1;
+			};
+		};
 		DCA1CFE03F952840914E5D99 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/sparkle-project/Sparkle.git";
@@ -798,6 +810,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		A1B2C3D62F6A000000A34B51 /* SnapKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A1B2C3D52F6A000000A34B51 /* XCRemoteSwiftPackageReference "SnapKit" */;
+			productName = SnapKit;
+		};
 		01AF1926754AF7C59AE59BA3 /* Sparkle */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = DCA1CFE03F952840914E5D99 /* XCRemoteSwiftPackageReference "Sparkle" */;

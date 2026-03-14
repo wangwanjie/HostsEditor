@@ -7,6 +7,7 @@
 
 import Cocoa
 import Combine
+import SnapKit
 
 protocol ProfileTableViewContextMenuDelegate: AnyObject {
     func tableView(_ tableView: ProfileTableView, menuForRow row: Int) -> NSMenu?
@@ -192,19 +193,15 @@ class ViewController: NSViewController {
         splitView = NSSplitView()
         splitView.isVertical = true
         splitView.dividerStyle = .thin
-        splitView.translatesAutoresizingMaskIntoConstraints = false
         splitView.delegate = self
         splitView.addSubview(buildSidebar())
         splitView.addSubview(buildEditorSection())
         splitView.setHoldingPriority(.defaultLow, forSubviewAt: 0)
         splitView.setHoldingPriority(.defaultHigh, forSubviewAt: 1)
         view.addSubview(splitView)
-        NSLayoutConstraint.activate([
-            splitView.topAnchor.constraint(equalTo: view.topAnchor),
-            splitView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            splitView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            splitView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-        ])
+        splitView.snp.makeConstraints { make in
+            make.edges.equalToSuperview()
+        }
     }
 
     private func buildSidebar() -> NSView {
@@ -231,29 +228,29 @@ class ViewController: NSViewController {
         sidebarScroll.hasVerticalScroller = true
         sidebarScroll.autohidesScrollers = true
         sidebarScroll.borderType = .noBorder
-        sidebarScroll.translatesAutoresizingMaskIntoConstraints = false
         sidebar.addSubview(sidebarScroll)
 
         addProfileButton = NSButton(title: "新建", target: self, action: #selector(showNewProfileMenu))
         addProfileButton.bezelStyle = .rounded
-        addProfileButton.translatesAutoresizingMaskIntoConstraints = false
-        sidebar.addSubview(addProfileButton)
 
         removeProfileButton = NSButton(title: "删除", target: self, action: #selector(removeProfile))
         removeProfileButton.bezelStyle = .rounded
-        removeProfileButton.translatesAutoresizingMaskIntoConstraints = false
-        sidebar.addSubview(removeProfileButton)
 
-        NSLayoutConstraint.activate([
-            sidebarScroll.topAnchor.constraint(equalTo: sidebar.topAnchor, constant: 8),
-            sidebarScroll.leadingAnchor.constraint(equalTo: sidebar.leadingAnchor, constant: 8),
-            sidebarScroll.trailingAnchor.constraint(equalTo: sidebar.trailingAnchor, constant: -8),
-            sidebarScroll.bottomAnchor.constraint(equalTo: addProfileButton.topAnchor, constant: -8),
-            addProfileButton.leadingAnchor.constraint(equalTo: sidebar.leadingAnchor, constant: 8),
-            addProfileButton.bottomAnchor.constraint(equalTo: removeProfileButton.topAnchor, constant: -4),
-            removeProfileButton.leadingAnchor.constraint(equalTo: sidebar.leadingAnchor, constant: 8),
-            removeProfileButton.bottomAnchor.constraint(equalTo: sidebar.bottomAnchor, constant: -8),
-        ])
+        let buttonStack = NSStackView(views: [addProfileButton, removeProfileButton])
+        buttonStack.orientation = .vertical
+        buttonStack.alignment = .leading
+        buttonStack.spacing = 4
+        sidebar.addSubview(buttonStack)
+
+        sidebarScroll.snp.makeConstraints { make in
+            make.top.leading.trailing.equalToSuperview().inset(8)
+            make.bottom.equalTo(buttonStack.snp.top).offset(-8)
+        }
+
+        buttonStack.snp.makeConstraints { make in
+            make.leading.bottom.equalToSuperview().inset(8)
+            make.trailing.lessThanOrEqualToSuperview().inset(8)
+        }
         return sidebar
     }
 
@@ -274,46 +271,44 @@ class ViewController: NSViewController {
         editorScroll.hasHorizontalScroller = false
         editorScroll.autohidesScrollers = true
         editorScroll.borderType = .noBorder
-        editorScroll.translatesAutoresizingMaskIntoConstraints = false
         right.addSubview(editorScroll)
 
         applyButton = NSButton(title: "保存并应用", target: self, action: #selector(saveAndApply))
         applyButton.bezelStyle = .rounded
         applyButton.keyEquivalent = "\r"
-        applyButton.translatesAutoresizingMaskIntoConstraints = false
-        right.addSubview(applyButton)
 
         refreshButton = NSButton(title: "刷新", target: self, action: #selector(refreshCurrentHosts))
         refreshButton.bezelStyle = .rounded
-        refreshButton.translatesAutoresizingMaskIntoConstraints = false
-        right.addSubview(refreshButton)
 
         refreshRemoteButton = NSButton(title: "刷新远程", target: self, action: #selector(refreshRemote))
         refreshRemoteButton.bezelStyle = .rounded
-        refreshRemoteButton.translatesAutoresizingMaskIntoConstraints = false
-        right.addSubview(refreshRemoteButton)
+
+        let actionStack = NSStackView(views: [applyButton, refreshButton, refreshRemoteButton])
+        actionStack.orientation = .horizontal
+        actionStack.alignment = .centerY
+        actionStack.spacing = 8
+        right.addSubview(actionStack)
 
         errorLabel = NSTextField(labelWithString: "")
         errorLabel.textColor = .systemRed
         errorLabel.lineBreakMode = .byTruncatingTail
-        errorLabel.translatesAutoresizingMaskIntoConstraints = false
         right.addSubview(errorLabel)
 
-        NSLayoutConstraint.activate([
-            editorScroll.topAnchor.constraint(equalTo: right.topAnchor, constant: 8),
-            editorScroll.leadingAnchor.constraint(equalTo: right.leadingAnchor, constant: 8),
-            editorScroll.trailingAnchor.constraint(equalTo: right.trailingAnchor, constant: -8),
-            editorScroll.bottomAnchor.constraint(equalTo: applyButton.topAnchor, constant: -8),
-            applyButton.leadingAnchor.constraint(equalTo: right.leadingAnchor, constant: 8),
-            applyButton.bottomAnchor.constraint(equalTo: errorLabel.topAnchor, constant: -4),
-            refreshButton.leadingAnchor.constraint(equalTo: applyButton.trailingAnchor, constant: 8),
-            refreshButton.centerYAnchor.constraint(equalTo: applyButton.centerYAnchor),
-            refreshRemoteButton.leadingAnchor.constraint(equalTo: refreshButton.trailingAnchor, constant: 8),
-            refreshRemoteButton.centerYAnchor.constraint(equalTo: applyButton.centerYAnchor),
-            errorLabel.leadingAnchor.constraint(equalTo: right.leadingAnchor, constant: 8),
-            errorLabel.trailingAnchor.constraint(lessThanOrEqualTo: right.trailingAnchor, constant: -8),
-            errorLabel.bottomAnchor.constraint(equalTo: right.bottomAnchor, constant: -8),
-        ])
+        editorScroll.snp.makeConstraints { make in
+            make.top.leading.trailing.equalToSuperview().inset(8)
+            make.bottom.equalTo(actionStack.snp.top).offset(-8)
+        }
+
+        actionStack.snp.makeConstraints { make in
+            make.leading.equalToSuperview().inset(8)
+            make.bottom.equalTo(errorLabel.snp.top).offset(-4)
+        }
+
+        errorLabel.snp.makeConstraints { make in
+            make.leading.equalToSuperview().inset(8)
+            make.trailing.lessThanOrEqualToSuperview().inset(8)
+            make.bottom.equalToSuperview().inset(8)
+        }
         return right
     }
 
@@ -425,33 +420,36 @@ class ViewController: NSViewController {
     }
 
     @objc private func showAddRemotePopover() {
-        let content = NSView(frame: NSRect(x: 0, y: 0, width: 340, height: 56))
+        let content = NSView(frame: NSRect(x: 0, y: 0, width: 360, height: 56))
         content.wantsLayer = true
 
         let label = NSTextField(labelWithString: "远程 URL：")
-        label.translatesAutoresizingMaskIntoConstraints = false
         content.addSubview(label)
 
         remoteURLField = NSTextField()
         remoteURLField.placeholderString = "https://..."
-        remoteURLField.translatesAutoresizingMaskIntoConstraints = false
         content.addSubview(remoteURLField)
 
         addRemoteConfirmButton = NSButton(title: "添加", target: self, action: #selector(addRemoteFromPopover))
         addRemoteConfirmButton.bezelStyle = .rounded
-        addRemoteConfirmButton.translatesAutoresizingMaskIntoConstraints = false
         content.addSubview(addRemoteConfirmButton)
 
-        NSLayoutConstraint.activate([
-            label.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 12),
-            label.centerYAnchor.constraint(equalTo: content.centerYAnchor),
-            remoteURLField.leadingAnchor.constraint(equalTo: label.trailingAnchor, constant: 8),
-            remoteURLField.centerYAnchor.constraint(equalTo: content.centerYAnchor),
-            remoteURLField.widthAnchor.constraint(equalToConstant: 220),
-            addRemoteConfirmButton.leadingAnchor.constraint(equalTo: remoteURLField.trailingAnchor, constant: 8),
-            addRemoteConfirmButton.centerYAnchor.constraint(equalTo: content.centerYAnchor),
-            addRemoteConfirmButton.trailingAnchor.constraint(lessThanOrEqualTo: content.trailingAnchor, constant: -12),
-        ])
+        label.snp.makeConstraints { make in
+            make.leading.equalToSuperview().inset(12)
+            make.centerY.equalToSuperview()
+        }
+
+        remoteURLField.snp.makeConstraints { make in
+            make.leading.equalTo(label.snp.trailing).offset(8)
+            make.centerY.equalToSuperview()
+            make.width.equalTo(220)
+        }
+
+        addRemoteConfirmButton.snp.makeConstraints { make in
+            make.leading.equalTo(remoteURLField.snp.trailing).offset(8)
+            make.trailing.lessThanOrEqualToSuperview().inset(12)
+            make.centerY.equalToSuperview()
+        }
 
         let popover = NSPopover()
         popover.contentSize = content.frame.size
@@ -604,30 +602,10 @@ extension ViewController: NSTableViewDataSource, NSTableViewDelegate {
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         if row == localHeaderRow {
-            let cell = NSTableCellView()
-            let label = NSTextField(labelWithString: "本地配置")
-            label.font = NSFont.boldSystemFont(ofSize: NSFont.smallSystemFontSize)
-            label.textColor = .secondaryLabelColor
-            label.translatesAutoresizingMaskIntoConstraints = false
-            cell.addSubview(label)
-            NSLayoutConstraint.activate([
-                label.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 8),
-                label.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
-            ])
-            return cell
+            return makeSectionHeaderCell(title: "本地配置")
         }
         if row == remoteHeaderRow {
-            let cell = NSTableCellView()
-            let label = NSTextField(labelWithString: "远程配置")
-            label.font = NSFont.boldSystemFont(ofSize: NSFont.smallSystemFontSize)
-            label.textColor = .secondaryLabelColor
-            label.translatesAutoresizingMaskIntoConstraints = false
-            cell.addSubview(label)
-            NSLayoutConstraint.activate([
-                label.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 8),
-                label.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
-            ])
-            return cell
+            return makeSectionHeaderCell(title: "远程配置")
         }
         let cellId = NSUserInterfaceItemIdentifier("ProfileCell")
         var cell = tableView.makeView(withIdentifier: cellId, owner: self) as? ProfileCellView
@@ -726,5 +704,20 @@ extension ViewController: ProfileTableViewContextMenuDelegate {
         menu.addItem(deleteItem)
 
         return menu
+    }
+}
+
+private extension ViewController {
+    func makeSectionHeaderCell(title: String) -> NSTableCellView {
+        let cell = NSTableCellView()
+        let label = NSTextField(labelWithString: title)
+        label.font = NSFont.boldSystemFont(ofSize: NSFont.smallSystemFontSize)
+        label.textColor = .secondaryLabelColor
+        cell.addSubview(label)
+        label.snp.makeConstraints { make in
+            make.leading.equalToSuperview().inset(8)
+            make.centerY.equalToSuperview()
+        }
+        return cell
     }
 }

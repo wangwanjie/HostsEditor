@@ -4,6 +4,7 @@
 //
 
 import Cocoa
+import SnapKit
 
 final class ProfileCellView: NSTableCellView {
 
@@ -15,7 +16,6 @@ final class ProfileCellView: NSTableCellView {
 
     override init(frame: NSRect) {
         checkbox = NSButton(checkboxWithTitle: "", target: nil, action: nil)
-        checkbox.translatesAutoresizingMaskIntoConstraints = false
 
         nameField = NSTextField(labelWithString: "")
         nameField.isEditable = true
@@ -23,21 +23,22 @@ final class ProfileCellView: NSTableCellView {
         nameField.drawsBackground = false
         nameField.focusRingType = .none
         nameField.lineBreakMode = .byTruncatingTail
-        nameField.translatesAutoresizingMaskIntoConstraints = false
 
         super.init(frame: frame)
         addSubview(checkbox)
         addSubview(nameField)
 
-        NSLayoutConstraint.activate([
-            checkbox.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 6),
-            checkbox.centerYAnchor.constraint(equalTo: centerYAnchor),
-            checkbox.widthAnchor.constraint(equalToConstant: 18),
+        checkbox.snp.makeConstraints { make in
+            make.leading.equalToSuperview().inset(6)
+            make.centerY.equalToSuperview()
+            make.width.equalTo(18)
+        }
 
-            nameField.leadingAnchor.constraint(equalTo: checkbox.trailingAnchor, constant: 6),
-            nameField.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -6),
-            nameField.centerYAnchor.constraint(equalTo: centerYAnchor),
-        ])
+        nameField.snp.makeConstraints { make in
+            make.leading.equalTo(checkbox.snp.trailing).offset(6)
+            make.trailing.equalToSuperview().inset(6)
+            make.centerY.equalToSuperview()
+        }
     }
 
     required init?(coder: NSCoder) { fatalError() }
