@@ -137,7 +137,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
-        return true
+        return false
     }
 
     /// 关闭窗口状态恢复，避免 restoreWindowWithIdentifier 报 className=(null)

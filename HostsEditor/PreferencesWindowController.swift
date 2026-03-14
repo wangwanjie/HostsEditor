@@ -21,6 +21,7 @@ final class PreferencesWindowController: NSWindowController {
         window.styleMask = [.titled, .closable, .miniaturizable]
         window.toolbarStyle = .preference
         window.isReleasedWhenClosed = false
+        window.isRestorable = false
         window.tabbingMode = .disallowed
         window.setContentSize(NSSize(width: 560, height: 320))
         window.minSize = NSSize(width: 560, height: 320)
