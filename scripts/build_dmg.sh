@@ -187,9 +187,14 @@ resign_for_notarization() {
         done < <(find "$frameworks_dir" -type f -print0)
     fi
 
-    /usr/bin/codesign --force --sign "$identity" --timestamp --options runtime \
-        --entitlements "$HELPER_ENTITLEMENTS" \
-        "$HELPER_PATH"
+    if [[ -f "$HELPER_ENTITLEMENTS" ]]; then
+        /usr/bin/codesign --force --sign "$identity" --timestamp --options runtime \
+            --entitlements "$HELPER_ENTITLEMENTS" \
+            "$HELPER_PATH"
+    else
+        /usr/bin/codesign --force --sign "$identity" --timestamp --options runtime \
+            "$HELPER_PATH"
+    fi
 
     /usr/bin/codesign --force --sign "$identity" --timestamp --options runtime \
         --entitlements "$APP_ENTITLEMENTS" \
