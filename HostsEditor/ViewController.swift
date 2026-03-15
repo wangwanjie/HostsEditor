@@ -150,6 +150,14 @@ class ViewController: NSViewController {
         updateButtonsForSelection()
     }
 
+    @objc func makeTextLarger(_ sender: Any?) {
+        settings.adjustEditorFontSize(by: AppSettings.editorFontSizeStep)
+    }
+
+    @objc func makeTextSmaller(_ sender: Any?) {
+        settings.adjustEditorFontSize(by: -AppSettings.editorFontSizeStep)
+    }
+
     private var didConfigureWindowFrameAutosave = false
 
     override func viewWillAppear() {
@@ -678,6 +686,17 @@ extension ViewController: NSSplitViewDelegate {
 
     func splitView(_ splitView: NSSplitView, constrainMaxCoordinate proposedMaximumPosition: CGFloat, ofSubviewAt index: Int) -> CGFloat {
         return index == 0 ? max(120, splitView.bounds.width - 150) : proposedMaximumPosition
+    }
+}
+
+extension ViewController: NSUserInterfaceValidations {
+    func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {
+        switch item.action {
+        case #selector(makeTextLarger(_:)), #selector(makeTextSmaller(_:)):
+            return view.window?.contentViewController === self
+        default:
+            return true
+        }
     }
 }
 

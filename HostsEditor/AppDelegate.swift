@@ -83,6 +83,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         editMenu.addItem(NSMenuItem(title: "删除", action: #selector(NSText.delete(_:)), keyEquivalent: ""))
         editMenu.addItem(NSMenuItem.separator())
         editMenu.addItem(NSMenuItem(title: "全选", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a"))
+        let enlargeTextItem = NSMenuItem(title: "增大字体", action: #selector(ViewController.makeTextLarger(_:)), keyEquivalent: "+")
+        enlargeTextItem.keyEquivalentModifierMask = [.command]
+        editMenu.addItem(enlargeTextItem)
+        let shrinkTextItem = NSMenuItem(title: "减小字体", action: #selector(ViewController.makeTextSmaller(_:)), keyEquivalent: "-")
+        shrinkTextItem.keyEquivalentModifierMask = [.command]
+        editMenu.addItem(shrinkTextItem)
         let editItem = NSMenuItem(title: "编辑", action: nil, keyEquivalent: "")
         editItem.submenu = editMenu
         main.addItem(editItem)

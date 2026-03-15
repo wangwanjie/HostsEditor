@@ -22,4 +22,24 @@ struct HostsEditorTests {
         #expect(ReleaseVersion("v2.0.0-beta.1") == ReleaseVersion("2.0"))
     }
 
+    @MainActor
+    @Test func adjustedEditorFontSizeClampsToUpperBound() async throws {
+        #expect(
+            AppSettings.adjustedEditorFontSize(
+                AppSettings.maxEditorFontSize,
+                delta: AppSettings.editorFontSizeStep
+            ) == AppSettings.maxEditorFontSize
+        )
+    }
+
+    @MainActor
+    @Test func adjustedEditorFontSizeClampsToLowerBound() async throws {
+        #expect(
+            AppSettings.adjustedEditorFontSize(
+                AppSettings.minEditorFontSize,
+                delta: -AppSettings.editorFontSizeStep
+            ) == AppSettings.minEditorFontSize
+        )
+    }
+
 }
