@@ -67,9 +67,13 @@ private extension EditorFindBarView {
     func buildUI() {
         findField.placeholderString = "查找"
         findField.focusRingType = .none
+        findField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        findField.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
         replaceField.placeholderString = "替换"
         replaceField.focusRingType = .none
+        replaceField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        replaceField.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
         matchCountLabel.alignment = .center
         matchCountLabel.textColor = .secondaryLabelColor

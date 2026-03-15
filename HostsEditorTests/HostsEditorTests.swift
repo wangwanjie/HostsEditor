@@ -107,4 +107,28 @@ struct HostsEditorTests {
         )
     }
 
+    @Test func sidebarWidthIsNotPersistedBeforeInitialWidthIsApplied() async throws {
+        #expect(
+            !ViewController.shouldPersistSidebarWidth(
+                hasAppliedInitialWidth: false,
+                isApplyingStoredWidth: false
+            )
+        )
+    }
+
+    @Test func sidebarWidthIsPersistedAfterInitialWidthIsApplied() async throws {
+        #expect(
+            ViewController.shouldPersistSidebarWidth(
+                hasAppliedInitialWidth: true,
+                isApplyingStoredWidth: false
+            )
+        )
+        #expect(
+            !ViewController.shouldPersistSidebarWidth(
+                hasAppliedInitialWidth: true,
+                isApplyingStoredWidth: true
+            )
+        )
+    }
+
 }

@@ -377,8 +377,9 @@ class ViewController: NSViewController {
 
         findBarView.snp.makeConstraints { make in
             make.top.trailing.equalToSuperview().inset(12)
-            make.width.lessThanOrEqualToSuperview().inset(16)
-            make.width.equalTo(420)
+            make.leading.greaterThanOrEqualToSuperview().inset(12)
+            make.width.lessThanOrEqualTo(420)
+            make.width.equalTo(420).priority(.high)
         }
 
         applyButton.snp.makeConstraints { make in
@@ -1010,7 +1011,10 @@ extension ViewController: NSSplitViewDelegate {
 
     func splitViewDidResizeSubviews(_ notification: Notification) {
         syncProfileColumnWidth()
-        guard !isApplyingStoredSidebarWidth,
+        guard Self.shouldPersistSidebarWidth(
+                hasAppliedInitialWidth: didApplyInitialSidebarWidth,
+                isApplyingStoredWidth: isApplyingStoredSidebarWidth
+              ),
               let sidebar = splitView.subviews.first else { return }
         settings.sidebarWidth = Double(sidebar.frame.width)
     }
@@ -1084,6 +1088,13 @@ extension ViewController {
         }
 
         return editorContainerView.map { view.isDescendant(of: $0) } ?? false
+    }
+
+    static func shouldPersistSidebarWidth(
+        hasAppliedInitialWidth: Bool,
+        isApplyingStoredWidth: Bool
+    ) -> Bool {
+        hasAppliedInitialWidth && !isApplyingStoredWidth
     }
 
     func makeSectionHeaderCell(title: String) -> NSTableCellView {
