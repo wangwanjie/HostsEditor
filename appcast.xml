@@ -3,24 +3,36 @@
     <channel>
         <title>HostsEditor</title>
         <item>
+            <title>1.5</title>
+            <pubDate>Sun, 15 Mar 2026 21:50:45 +0800</pubDate>
+            <link>https://github.com/wangwanjie/HostsEditor/releases/tag/v1.5</link>
+            <sparkle:version>5</sparkle:version>
+            <sparkle:shortVersionString>1.5</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/wangwanjie/HostsEditor/releases/download/v1.5/HostsEditor_V_1.5.dmg" length="4762434" type="application/octet-stream" sparkle:edSignature="kcRUxqVsbW3kqq8MXiw0CmOOTaaTpZsUwM5OPN/4G8iv2VhzF5kKir71G1x7H54jL1pyn3DqbEhIRNFLvSJYCQ==" />
+            <sparkle:deltas>
+                <enclosure url="https://raw.githubusercontent.com/wangwanjie/HostsEditor/main/HostsEditor5-4.delta" sparkle:deltaFrom="4" length="262802" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="GODP0liWdpaQicyLytMOQRZ+VVRqIyhnOf9pbOmgtSTnd8q3AkdZBGm+h1y6Vqtk9zQSnTDoPxdxFoyyWlrLCA==" />
+                <enclosure url="https://raw.githubusercontent.com/wangwanjie/HostsEditor/main/HostsEditor5-3.delta" sparkle:deltaFrom="3" length="1245730" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="1cKsOOACnGtPxEc/M/bxjrfql8RRzUtB3aBnUhWg6irQjWLoXqG7R9ziN6U3/XafGa51ApR7G6hgBUVHQ/KuBA==" />
+                <enclosure url="https://raw.githubusercontent.com/wangwanjie/HostsEditor/main/HostsEditor5-2.delta" sparkle:deltaFrom="2" length="1405082" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="4Cz9YnNESBNphM9r4gSc1ZFBnjdogHCtdM/l4UF1K3p2uS8O70aeSYgUI2XvEXAZCo61KcDazHxlv7hLrMHbDg==" />
+                <enclosure url="https://raw.githubusercontent.com/wangwanjie/HostsEditor/main/HostsEditor5-1.delta" sparkle:deltaFrom="1" length="472950" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="Jl8gFZibBQacKYjFe4duLI5kf9Ib5XkIgSHxZq0dkrIrzhoN3J5wE1P5EsgOCU9UgsiQf+jvCvPbrqQk4WjCBA==" />
+            </sparkle:deltas>
+            <description>&lt;h1&gt;更新内容&lt;/h1&gt;
+&lt;ul&gt;&lt;li&gt;主界面的配置列表宽度现在会记住上次调整结果，远程配置右键菜单也补充了“刷新”，状态栏图标换成了更贴近 hosts 编辑的样式。&lt;/li&gt;&lt;li&gt;Hosts 编辑器新增 `Command + /` 行注释切换，以及类 VS Code 的内联查找与替换；只读内容支持查找，切换配置时会同步刷新查找结果。&lt;/li&gt;&lt;li&gt;修复了编辑配置名称、远程配置 URL 和查找替换输入框时按退格键会误触发“删除配置”确认弹窗的问题。&lt;/li&gt;&lt;li&gt;禁用的 hosts 条目改用更易区分的配色，配合新的查找高亮与替换操作，批量检查和调整映射更直观。&lt;/li&gt;&lt;/ul&gt;</description>
+        </item>
+        <item>
             <title>1.4</title>
-            <pubDate>Sun, 15 Mar 2026 19:48:52 +0800</pubDate>
+            <pubDate>Sun, 15 Mar 2026 21:50:45 +0800</pubDate>
             <link>https://github.com/wangwanjie/HostsEditor/releases/tag/v1.4</link>
             <sparkle:version>4</sparkle:version>
             <sparkle:shortVersionString>1.4</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
             <enclosure url="https://github.com/wangwanjie/HostsEditor/releases/download/v1.4/HostsEditor_V_1.4.dmg" length="4647728" type="application/octet-stream" sparkle:edSignature="V1KR6XfjI4cP1dy3/vtJ5oUipvCZN1qGvAwTnrhPNCikcEBt3uazD/TLIyWjoPq75OQuUIitx/wpNlUP2O6YCQ==" />
-            <sparkle:deltas>
-                <enclosure url="https://raw.githubusercontent.com/wangwanjie/HostsEditor/main/HostsEditor4-3.delta" sparkle:deltaFrom="3" length="1105026" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="A+CwFmdAqrynM1xa9BErJTz1yYzo5ek6SqOdaWXo7djDmyHHWb14zOH6EMf2ku7GcwdkMurksTGeATjNaN7dDw==" />
-                <enclosure url="https://raw.githubusercontent.com/wangwanjie/HostsEditor/main/HostsEditor4-2.delta" sparkle:deltaFrom="2" length="1323210" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="YA9UxFyoRzW+2oTDejWV3uK4DX3tl7jwy8KgpV8GdghXbJwt3N8nSBvvHcvImMAS1/TQtLhgrG0tu623lIUpCw==" />
-                <enclosure url="https://raw.githubusercontent.com/wangwanjie/HostsEditor/main/HostsEditor4-1.delta" sparkle:deltaFrom="1" length="390054" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="TBMIHt6OaUlftifqo66qLexQVNk4Qgzd4X3XvriYASaiYiQYdKn4RUElMB33YyDJTiVZZmrFRyP/UigAtMfVDw==" />
-            </sparkle:deltas>
             <description>&lt;h1&gt;更新内容&lt;/h1&gt;
 &lt;ul&gt;&lt;li&gt;Hosts 内容页现已支持 `Command` 配合 `+` / `-` 快速增大或减小字体，阅读和比对长 hosts 内容更方便。&lt;/li&gt;&lt;li&gt;快捷键与偏好设置中的字体大小保持同步，并继续遵循最小/最大字号限制，避免误调到不可用范围。&lt;/li&gt;&lt;/ul&gt;</description>
         </item>
         <item>
             <title>1.3</title>
-            <pubDate>Sun, 15 Mar 2026 19:48:52 +0800</pubDate>
+            <pubDate>Sun, 15 Mar 2026 21:50:45 +0800</pubDate>
             <link>https://github.com/wangwanjie/HostsEditor/releases/tag/v1.3</link>
             <sparkle:version>3</sparkle:version>
             <sparkle:shortVersionString>1.3</sparkle:shortVersionString>
@@ -28,16 +40,6 @@
             <enclosure url="https://github.com/wangwanjie/HostsEditor/releases/download/v1.3/HostsEditor_V_1.3.dmg" length="4645811" type="application/octet-stream" sparkle:edSignature="dLad3duaz/21O6sDi5qb+hg8uV4y1vsEyypH9XQQ3yVw4guz6udUxbcYMcy4ra6uQMaN4ZarVQ3K75DJ3J2mCQ==" />
             <description>&lt;h1&gt;更新内容&lt;/h1&gt;
 &lt;ul&gt;&lt;li&gt;将主界面与偏好设置窗口的布局统一迁移到 SnapKit，并修复启动阶段的约束冲突与布局警告。&lt;/li&gt;&lt;li&gt;偏好设置改为分段式页面，补充帮助程序管理入口，并修复编辑器字体大小调节时的实时显示问题。&lt;/li&gt;&lt;li&gt;修复窗口状态恢复相关日志，以及启动时 `layoutSubtreeIfNeeded` 引发的递归布局警告。&lt;/li&gt;&lt;li&gt;Sparkle 更新说明改为内嵌显示实际发布内容，不再跳转到 GitHub 网页。&lt;/li&gt;&lt;/ul&gt;</description>
-        </item>
-        <item>
-            <title>1.2</title>
-            <pubDate>Sun, 15 Mar 2026 19:48:52 +0800</pubDate>
-            <link>https://github.com/wangwanjie/HostsEditor/releases/tag/v1.2</link>
-            <sparkle:version>2</sparkle:version>
-            <sparkle:shortVersionString>1.2</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
-            <enclosure url="https://github.com/wangwanjie/HostsEditor/releases/download/v1.2/HostsEditor_V_1.2.dmg" length="4379681" type="application/octet-stream" sparkle:edSignature="aMIV76uwadHuc+4VGBXZSORYF4o9jSBOmcNcqo90FicDuwqv6LtGOXLG0TpOpAGjfdNpTsaW7KYdIZN+JZN1Cw==" />
-            <description>&lt;p&gt;&lt;strong&gt;Full Changelog&lt;/strong&gt;: &lt;a href="https://github.com/wangwanjie/HostsEditor/compare/v1.1...v1.2"&gt;https://github.com/wangwanjie/HostsEditor/compare/v1.1...v1.2&lt;/a&gt;&lt;/p&gt;</description>
         </item>
         <link>https://github.com/wangwanjie/HostsEditor</link>
         <description>HostsEditor release feed.</description>
