@@ -9,6 +9,7 @@ import AppKit
 
 struct HostsHighlightTheme {
     var comment: NSColor
+    var disabledEntry: NSColor
     var ipAddress: NSColor
     var hostname: NSColor
     var defaultText: NSColor
@@ -18,6 +19,7 @@ struct HostsHighlightTheme {
         if isDark {
             return HostsHighlightTheme(
                 comment: NSColor(calibratedWhite: 0.5, alpha: 1),
+                disabledEntry: NSColor(calibratedRed: 0.88, green: 0.63, blue: 0.52, alpha: 1),
                 ipAddress: NSColor(red: 0.4, green: 0.7, blue: 1, alpha: 1),
                 hostname: NSColor(red: 0.7, green: 0.9, blue: 0.6, alpha: 1),
                 defaultText: NSColor.textColor
@@ -25,6 +27,7 @@ struct HostsHighlightTheme {
         } else {
             return HostsHighlightTheme(
                 comment: NSColor(calibratedWhite: 0.4, alpha: 1),
+                disabledEntry: NSColor(calibratedRed: 0.67, green: 0.34, blue: 0.24, alpha: 1),
                 ipAddress: NSColor(red: 0.1, green: 0.3, blue: 0.8, alpha: 1),
                 hostname: NSColor(red: 0.2, green: 0.5, blue: 0.2, alpha: 1),
                 defaultText: NSColor.textColor
@@ -59,13 +62,6 @@ final class HostsSyntaxHighlighter: NSObject, NSTextStorageDelegate {
         storage.removeAttribute(.foregroundColor, range: safeRange)
         storage.addAttribute(.foregroundColor, value: theme.defaultText, range: safeRange)
 
-        // 注释：# 到行尾
-        let commentPattern = try? NSRegularExpression(pattern: "#[^\n]*", options: [])
-        commentPattern?.enumerateMatches(in: string as String, options: [], range: safeRange) { match, _, _ in
-            guard let r = match?.range else { return }
-            storage.addAttribute(.foregroundColor, value: theme.comment, range: r)
-        }
-
         // IPv4
         let ipPattern = try? NSRegularExpression(pattern: "\\b(?:\\d{1,3}\\.){3}\\d{1,3}\\b", options: [])
         ipPattern?.enumerateMatches(in: string as String, options: [], range: safeRange) { match, _, _ in
@@ -86,6 +82,23 @@ final class HostsSyntaxHighlighter: NSObject, NSTextStorageDelegate {
             if storage.length >= globalRange.location + globalRange.length {
                 storage.addAttribute(.foregroundColor, value: theme.hostname, range: globalRange)
             }
+        }
+
+        // 普通注释：# 到行尾
+        let commentPattern = try? NSRegularExpression(pattern: "#[^\\n]*", options: [])
+        commentPattern?.enumerateMatches(in: string as String, options: [], range: safeRange) { match, _, _ in
+            guard let r = match?.range else { return }
+            storage.addAttribute(.foregroundColor, value: theme.comment, range: r)
+        }
+
+        // 被禁用的 hosts 规则：整行着色，避免看起来仍像生效条目。
+        let disabledPattern = try? NSRegularExpression(
+            pattern: "(?m)^[ \\t]*#\\s*(?:\\d{1,3}\\.){3}\\d{1,3}\\b[^\\n]*",
+            options: []
+        )
+        disabledPattern?.enumerateMatches(in: string as String, options: [], range: safeRange) { match, _, _ in
+            guard let r = match?.range else { return }
+            storage.addAttribute(.foregroundColor, value: theme.disabledEntry, range: r)
         }
 
         storage.endEditing()

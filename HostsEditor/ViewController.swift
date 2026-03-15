@@ -34,9 +34,11 @@ class ViewController: NSViewController {
 
     private var splitView: NSSplitView!
     private var sidebarScroll: NSScrollView!
+    private var sidebarColumn: NSTableColumn!
     private var profileTableView: ProfileTableView!
     private var editorScroll: NSScrollView!
     private var editorTextView: HostsEditorTextView!
+    private var findBarView: EditorFindBarView!
     private var addProfileButton: NSButton!
     private var removeProfileButton: NSButton!
     private var applyButton: NSButton!
@@ -47,6 +49,11 @@ class ViewController: NSViewController {
     private var remoteURLField: NSTextField!
     private var addRemoteConfirmButton: NSButton!
     private var keyMonitor: Any?
+    private var didApplyInitialSidebarWidth = false
+    private var isApplyingStoredSidebarWidth = false
+    private var isReplaceBarExpanded = false
+    private var findMatches: [NSRange] = []
+    private var currentFindMatchIndex: Int?
 
     /// 左侧选中项：系统（当前 hosts 全文）、默认（仅基底，不含 HostsEditor 块）、或某个方案
     private enum SidebarSelection: Equatable {
@@ -78,6 +85,21 @@ class ViewController: NSViewController {
     private var remoteHeaderRow: Int { 3 + localProfiles.count }
     private func remoteProfileRow(_ index: Int) -> Int { 3 + localProfiles.count + 1 + index }
     private var totalRows: Int { 4 + localProfiles.count + remoteProfiles.count }
+    private var isFindBarVisible: Bool { findBarView != nil && !findBarView.isHidden }
+    private var currentFindRange: NSRange? {
+        guard let currentFindMatchIndex, findMatches.indices.contains(currentFindMatchIndex) else { return nil }
+        return findMatches[currentFindMatchIndex]
+    }
+    private var canEditCurrentSelection: Bool {
+        switch selection {
+        case .system:
+            return true
+        case .base:
+            return false
+        case .profile(let id):
+            return manager.profile(for: id)?.isRemote != true
+        }
+    }
 
     /// 是否为可选的配置行（非 section header）
     private func isSelectableRow(_ row: Int) -> Bool {
@@ -146,9 +168,32 @@ class ViewController: NSViewController {
         }
     }
 
-    @objc private func editorTextDidChange(_ note: Notification) {
-        updateButtonsForSelection()
+    override func viewWillAppear() {
+        super.viewWillAppear()
+        configureWindowIfNeeded()
     }
+
+    override func viewDidAppear() {
+        super.viewDidAppear()
+        applyStoredSidebarWidthIfNeeded()
+        if profileTableView.selectedRow < 0 {
+            profileTableView.selectRowIndexes(IndexSet(integer: systemRow), byExtendingSelection: false)
+            selection = .system
+            updateButtonsForSelection()
+        }
+    }
+
+    override func viewDidLayout() {
+        super.viewDidLayout()
+        applyStoredSidebarWidthIfNeeded()
+        syncProfileColumnWidth()
+    }
+
+    deinit {
+        if let m = keyMonitor { NSEvent.removeMonitor(m) }
+    }
+
+    // MARK: - Menu Actions
 
     @objc func makeTextLarger(_ sender: Any?) {
         settings.adjustEditorFontSize(by: AppSettings.editorFontSizeStep)
@@ -158,21 +203,26 @@ class ViewController: NSViewController {
         settings.adjustEditorFontSize(by: -AppSettings.editorFontSizeStep)
     }
 
+    @objc func showFindBar(_ sender: Any?) {
+        presentFindBar(showReplace: false, focusReplaceField: false)
+    }
+
+    @objc func showReplaceBar(_ sender: Any?) {
+        presentFindBar(showReplace: canEditCurrentSelection, focusReplaceField: canEditCurrentSelection)
+    }
+
+    @objc func toggleCommentSelection(_ sender: Any?) {
+        guard canEditCurrentSelection else { return }
+        let result = HostsEditorTextEditing.toggleComments(
+            in: editorTextView.string,
+            selectedRanges: editorTextView.selectedNSRanges
+        )
+        applyEditorMutation(result)
+    }
+
+    // MARK: - Window Configuration
+
     private var didConfigureWindowFrameAutosave = false
-
-    override func viewWillAppear() {
-        super.viewWillAppear()
-        configureWindowIfNeeded()
-    }
-
-    override func viewDidAppear() {
-        super.viewDidAppear()
-        if profileTableView.selectedRow < 0 {
-            profileTableView.selectRowIndexes(IndexSet(integer: systemRow), byExtendingSelection: false)
-            selection = .system
-            updateButtonsForSelection()
-        }
-    }
 
     private func configureWindowIfNeeded() {
         guard let window = view.window else { return }
@@ -208,15 +258,17 @@ class ViewController: NSViewController {
     }
 
     private func buildSidebar() -> NSView {
-        let sidebar = NSView(frame: NSRect(x: 0, y: 0, width: 220, height: max(view.bounds.height, 320)))
+        let sidebarWidth = CGFloat(settings.sidebarWidth)
+        let sidebar = NSView(frame: NSRect(x: 0, y: 0, width: sidebarWidth, height: max(view.bounds.height, 320)))
         sidebar.wantsLayer = true
 
-        let col = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("Profile"))
-        col.title = "方案"
-        col.width = 200
+        sidebarColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("Profile"))
+        sidebarColumn.title = "方案"
+        sidebarColumn.width = max(180, sidebarWidth - 20)
+        sidebarColumn.resizingMask = .autoresizingMask
 
         profileTableView = ProfileTableView()
-        profileTableView.addTableColumn(col)
+        profileTableView.addTableColumn(sidebarColumn)
         profileTableView.headerView = nil
         profileTableView.rowHeight = 28
         profileTableView.delegate = self
@@ -225,6 +277,7 @@ class ViewController: NSViewController {
         profileTableView.allowsEmptySelection = true
         profileTableView.allowsMultipleSelection = false
         profileTableView.identifier = NSUserInterfaceItemIdentifier("Profiles")
+        profileTableView.columnAutoresizingStyle = .uniformColumnAutoresizingStyle
 
         sidebarScroll = NSScrollView()
         sidebarScroll.documentView = profileTableView
@@ -259,7 +312,7 @@ class ViewController: NSViewController {
     }
 
     private func buildEditorSection() -> NSView {
-        let right = NSView(frame: NSRect(x: 0, y: 0, width: max(view.bounds.width - 220, 320), height: max(view.bounds.height, 320)))
+        let right = NSView(frame: NSRect(x: 0, y: 0, width: max(view.bounds.width - CGFloat(settings.sidebarWidth), 320), height: max(view.bounds.height, 320)))
         right.wantsLayer = true
 
         editorTextView = HostsEditorTextView()
@@ -276,6 +329,24 @@ class ViewController: NSViewController {
         editorScroll.autohidesScrollers = true
         editorScroll.borderType = .noBorder
         right.addSubview(editorScroll)
+
+        findBarView = EditorFindBarView()
+        findBarView.isHidden = true
+        findBarView.findField.delegate = self
+        findBarView.replaceField.delegate = self
+        findBarView.previousButton.target = self
+        findBarView.previousButton.action = #selector(findPreviousMatch(_:))
+        findBarView.nextButton.target = self
+        findBarView.nextButton.action = #selector(findNextMatch(_:))
+        findBarView.replaceToggleButton.target = self
+        findBarView.replaceToggleButton.action = #selector(toggleReplacePanel(_:))
+        findBarView.replaceButton.target = self
+        findBarView.replaceButton.action = #selector(replaceCurrentMatch(_:))
+        findBarView.replaceAllButton.target = self
+        findBarView.replaceAllButton.action = #selector(replaceAllMatches(_:))
+        findBarView.closeButton.target = self
+        findBarView.closeButton.action = #selector(closeFindBar(_:))
+        right.addSubview(findBarView)
 
         applyButton = NSButton(title: "保存并应用", target: self, action: #selector(saveAndApply))
         applyButton.bezelStyle = .rounded
@@ -298,6 +369,12 @@ class ViewController: NSViewController {
         editorScroll.snp.makeConstraints { make in
             make.top.leading.trailing.equalToSuperview().inset(8)
             make.bottom.equalTo(applyButton.snp.top).offset(-8)
+        }
+
+        findBarView.snp.makeConstraints { make in
+            make.top.trailing.equalToSuperview().inset(12)
+            make.width.lessThanOrEqualToSuperview().inset(16)
+            make.width.equalTo(420)
         }
 
         applyButton.snp.makeConstraints { make in
@@ -328,7 +405,10 @@ class ViewController: NSViewController {
     private func setupBindings() {
         manager.$profiles
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in self?.reloadTablePreservingSelection() }
+            .sink { [weak self] _ in
+                self?.reloadTablePreservingSelection()
+                self?.updateButtonsForSelection()
+            }
             .store(in: &cancellables)
 
         manager.$currentSystemContent
@@ -338,6 +418,7 @@ class ViewController: NSViewController {
                 self.editorTextView.string = content
                 self.lastSyncedContent = content
                 self.editorTextView.setupSyntaxHighlighting()
+                self.refreshFindResults(scrollToCurrent: false)
                 self.updateButtonsForSelection()
             }
             .store(in: &cancellables)
@@ -368,6 +449,7 @@ class ViewController: NSViewController {
         if isSelectableRow(row) {
             profileTableView.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
         }
+        syncProfileColumnWidth()
         isUpdatingTable = false
     }
 
@@ -389,29 +471,231 @@ class ViewController: NSViewController {
                 lastSyncedContent = p.content
             }
         }
+
+        if !canEditCurrentSelection {
+            isReplaceBarExpanded = false
+        }
+
         editorTextView.setupSyntaxHighlighting()
         editorTextView.breakUndoCoalescing()
+        refreshFindResults(scrollToCurrent: false)
         updateButtonsForSelection()
     }
 
     private var isContentDirty: Bool { editorTextView.string != lastSyncedContent }
 
     private func updateButtonsForSelection() {
-        let canSave: Bool
-        switch selection { case .system, .profile: canSave = true; case .base: canSave = false }
+        let canSave = selection == .system || canEditCurrentSelection
         applyButton.isEnabled = canSave && isContentDirty && !manager.isLoading
+
         let isDeletableProfile: Bool
         if case .profile = selection { isDeletableProfile = true } else { isDeletableProfile = false }
         removeProfileButton.isEnabled = isDeletableProfile && !manager.isLoading
+
         refreshButton.isHidden = selection != .system
         if case .profile(let id) = selection, manager.profile(for: id)?.isRemote == true {
             refreshRemoteButton.isHidden = false
         } else {
             refreshRemoteButton.isHidden = true
         }
+
+        updateFindBarState(scrollToCurrent: false)
+    }
+
+    // MARK: - Sidebar State
+
+    private func applyStoredSidebarWidthIfNeeded(force: Bool = false) {
+        guard let splitView, splitView.subviews.count > 1, splitView.bounds.width > 0 else { return }
+        guard force || !didApplyInitialSidebarWidth else { return }
+
+        let maxWidth = max(CGFloat(AppSettings.minSidebarWidth), splitView.bounds.width - 150)
+        let width = min(CGFloat(settings.sidebarWidth), maxWidth)
+
+        isApplyingStoredSidebarWidth = true
+        splitView.setPosition(width, ofDividerAt: 0)
+        isApplyingStoredSidebarWidth = false
+
+        syncProfileColumnWidth()
+        didApplyInitialSidebarWidth = true
+    }
+
+    private func syncProfileColumnWidth() {
+        let availableWidth = max(120, sidebarScroll.contentSize.width - 2)
+        sidebarColumn?.width = availableWidth
+    }
+
+    // MARK: - Find / Replace
+
+    private func presentFindBar(showReplace: Bool, focusReplaceField: Bool) {
+        findBarView.isHidden = false
+        if showReplace && canEditCurrentSelection {
+            isReplaceBarExpanded = true
+        }
+        seedFindQueryFromSelectionIfNeeded()
+        refreshFindResults(scrollToCurrent: true)
+        updateFindBarState(scrollToCurrent: false)
+
+        let targetField: NSTextField = focusReplaceField && isReplaceBarExpanded && canEditCurrentSelection
+            ? findBarView.replaceField
+            : findBarView.findField
+        view.window?.makeFirstResponder(targetField)
+        targetField.selectText(nil)
+    }
+
+    private func seedFindQueryFromSelectionIfNeeded() {
+        guard findBarView.findField.stringValue.isEmpty,
+              let selectionRange = editorTextView.selectedNSRanges.first,
+              selectionRange.length > 0 else { return }
+
+        let selectedText = (editorTextView.string as NSString).substring(with: selectionRange)
+        guard !selectedText.contains(where: { $0.isNewline }) else { return }
+        findBarView.findField.stringValue = selectedText
+    }
+
+    @objc private func closeFindBar(_ sender: Any?) {
+        findBarView.isHidden = true
+        isReplaceBarExpanded = false
+        findMatches = []
+        currentFindMatchIndex = nil
+        editorTextView.clearSearchHighlights()
+        view.window?.makeFirstResponder(editorTextView)
+    }
+
+    @objc private func findNextMatch(_ sender: Any?) {
+        navigateFindMatch(forward: true)
+    }
+
+    @objc private func findPreviousMatch(_ sender: Any?) {
+        navigateFindMatch(forward: false)
+    }
+
+    @objc private func toggleReplacePanel(_ sender: Any?) {
+        guard canEditCurrentSelection else { return }
+        isReplaceBarExpanded.toggle()
+        updateFindBarState(scrollToCurrent: false)
+        if isReplaceBarExpanded {
+            view.window?.makeFirstResponder(findBarView.replaceField)
+            findBarView.replaceField.selectText(nil)
+        }
+    }
+
+    @objc private func replaceCurrentMatch(_ sender: Any?) {
+        guard canEditCurrentSelection, let currentFindRange else { return }
+
+        let replacement = findBarView.replaceField.stringValue
+        let result = HostsEditorTextEditing.replaceMatch(
+            in: editorTextView.string,
+            matchRange: currentFindRange,
+            with: replacement
+        )
+        applyEditorMutation(result)
+    }
+
+    @objc private func replaceAllMatches(_ sender: Any?) {
+        guard canEditCurrentSelection else { return }
+
+        let result = HostsEditorTextEditing.replaceAllMatches(
+            in: editorTextView.string,
+            query: findBarView.findField.stringValue,
+            with: findBarView.replaceField.stringValue
+        )
+        guard result.text != editorTextView.string else { return }
+        applyEditorMutation(result)
+    }
+
+    private func navigateFindMatch(forward: Bool) {
+        guard isFindBarVisible else {
+            presentFindBar(showReplace: false, focusReplaceField: false)
+            return
+        }
+        guard !findMatches.isEmpty else {
+            NSSound.beep()
+            return
+        }
+
+        if let currentFindMatchIndex {
+            if forward {
+                self.currentFindMatchIndex = (currentFindMatchIndex + 1) % findMatches.count
+            } else {
+                self.currentFindMatchIndex = (currentFindMatchIndex - 1 + findMatches.count) % findMatches.count
+            }
+        } else {
+            currentFindMatchIndex = 0
+        }
+
+        updateFindBarState(scrollToCurrent: true)
+    }
+
+    private func refreshFindResults(scrollToCurrent: Bool) {
+        guard isFindBarVisible else {
+            editorTextView.clearSearchHighlights()
+            return
+        }
+
+        let query = findBarView.findField.stringValue
+        guard !query.isEmpty else {
+            findMatches = []
+            currentFindMatchIndex = nil
+            updateFindBarState(scrollToCurrent: false)
+            return
+        }
+
+        let previousRange = currentFindRange
+        findMatches = HostsEditorTextEditing.matchRanges(in: editorTextView.string, query: query)
+
+        if let previousRange, let sameIndex = findMatches.firstIndex(of: previousRange) {
+            currentFindMatchIndex = sameIndex
+        } else if let selectionRange = editorTextView.selectedNSRanges.first,
+                  let selectedIndex = HostsEditorTextEditing.firstMatchIndex(containing: selectionRange, within: findMatches) {
+            currentFindMatchIndex = selectedIndex
+        } else {
+            currentFindMatchIndex = findMatches.isEmpty ? nil : 0
+        }
+
+        updateFindBarState(scrollToCurrent: scrollToCurrent)
+    }
+
+    private func updateFindBarState(scrollToCurrent: Bool) {
+        guard findBarView != nil else { return }
+
+        let canReplace = canEditCurrentSelection
+        if !canReplace {
+            isReplaceBarExpanded = false
+        }
+
+        findBarView.setReplaceAvailable(canReplace)
+        findBarView.setReplaceVisible(isReplaceBarExpanded && canReplace)
+
+        let currentDisplayIndex = currentFindMatchIndex.flatMap { index in
+            findMatches.indices.contains(index) ? index + 1 : nil
+        }
+        findBarView.updateMatchCount(current: currentDisplayIndex, total: findMatches.count)
+
+        let hasMatches = !findMatches.isEmpty
+        findBarView.previousButton.isEnabled = hasMatches
+        findBarView.nextButton.isEnabled = hasMatches
+        findBarView.replaceButton.isEnabled = canReplace && hasMatches
+        findBarView.replaceAllButton.isEnabled = canReplace && hasMatches
+
+        if isFindBarVisible {
+            editorTextView.updateSearchHighlights(matches: findMatches, currentIndex: currentFindMatchIndex, scrollToCurrent: scrollToCurrent)
+        } else {
+            editorTextView.clearSearchHighlights()
+        }
+    }
+
+    private func applyEditorMutation(_ result: HostsEditorTextEditResult) {
+        guard editorTextView.applyEditedText(result.text, selectedRanges: result.selectedRanges) else { return }
+        refreshFindResults(scrollToCurrent: true)
+        updateButtonsForSelection()
     }
 
     // MARK: - Actions
+
+    @objc private func editorTextDidChange(_ note: Notification) {
+        refreshFindResults(scrollToCurrent: false)
+        updateButtonsForSelection()
+    }
 
     @objc private func showNewProfileMenu() {
         let menu = NSMenu()
@@ -523,6 +807,20 @@ class ViewController: NSViewController {
         Task { await manager.setProfileEnabled(id: id, enabled: !profile.isEnabled) }
     }
 
+    @objc private func refreshRemoteFromContextMenu(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? String else { return }
+        Task { [weak self] in
+            guard let self else { return }
+            await self.manager.refreshRemoteProfile(id: id)
+            await MainActor.run {
+                self.pendingEdits.removeValue(forKey: id)
+                if case .profile(let currentId) = self.selection, currentId == id {
+                    self.syncEditorFromSelection()
+                }
+            }
+        }
+    }
+
     @objc private func removeProfileFromContextMenu(_ sender: NSMenuItem) {
         guard let id = sender.representedObject as? String else { return }
         let targetRow = row(for: .profile(id))
@@ -530,10 +828,6 @@ class ViewController: NSViewController {
         profileTableView.selectRowIndexes(IndexSet(integer: targetRow), byExtendingSelection: false)
         selection = .profile(id)
         removeProfile()
-    }
-
-    deinit {
-        if let m = keyMonitor { NSEvent.removeMonitor(m) }
     }
 
     /// 将编辑器当前内容保存：系统项直接写 hosts，方案项更新方案并视情况写入
@@ -557,18 +851,6 @@ class ViewController: NSViewController {
         }
     }
 
-    @objc private func addRemote() {
-        let url = remoteURLField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !url.isEmpty else {
-            manager.setErrorMessage("请输入远程 URL")
-            return
-        }
-        Task {
-            await manager.addRemoteProfile(urlString: url)
-            remoteURLField.stringValue = ""
-        }
-    }
-
     /// 刷新：重新从系统读取 hosts，并更新当前编辑器显示
     @objc private func refreshCurrentHosts() {
         Task { [weak self] in
@@ -585,11 +867,12 @@ class ViewController: NSViewController {
             manager.setErrorMessage("请先选择远程方案")
             return
         }
-        Task {
-            await manager.refreshRemoteProfile(id: id)
+        Task { [weak self] in
+            guard let self else { return }
+            await self.manager.refreshRemoteProfile(id: id)
             await MainActor.run {
-                pendingEdits.removeValue(forKey: id)
-                syncEditorFromSelection()
+                self.pendingEdits.removeValue(forKey: id)
+                self.syncEditorFromSelection()
             }
         }
     }
@@ -658,13 +941,20 @@ extension ViewController: NSTableViewDataSource, NSTableViewDelegate {
     }
 }
 
-// MARK: - NSTextFieldDelegate（行内改名）
+// MARK: - NSTextFieldDelegate
 
-extension ViewController: NSTextFieldDelegate {
+extension ViewController: NSTextFieldDelegate, NSSearchFieldDelegate {
+    func controlTextDidChange(_ obj: Notification) {
+        guard let field = obj.object as? NSTextField else { return }
+        if field === findBarView.findField {
+            refreshFindResults(scrollToCurrent: true)
+        }
+    }
 
     func controlTextDidEndEditing(_ obj: Notification) {
-        guard let field = obj.object as? NSTextField,
-              let cell = field.superview as? ProfileCellView,
+        guard let field = obj.object as? NSTextField else { return }
+        guard field !== findBarView.findField, field !== findBarView.replaceField else { return }
+        guard let cell = field.superview as? ProfileCellView,
               let id = cell.profileId else { return }
         let newName = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !newName.isEmpty else {
@@ -675,25 +965,63 @@ extension ViewController: NSTextFieldDelegate {
         let cleanName = newName.replacingOccurrences(of: " ☁", with: "")
         manager.updateProfile(id: id, name: cleanName)
     }
+
+    func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+        if control === findBarView.findField {
+            if commandSelector == #selector(NSResponder.insertNewline(_:)) {
+                navigateFindMatch(forward: !(NSApp.currentEvent?.modifierFlags.contains(.shift) ?? false))
+                return true
+            }
+            if commandSelector == #selector(NSResponder.cancelOperation(_:)) {
+                closeFindBar(nil)
+                return true
+            }
+        }
+
+        if control === findBarView.replaceField {
+            if commandSelector == #selector(NSResponder.insertNewline(_:)) {
+                replaceCurrentMatch(nil)
+                return true
+            }
+            if commandSelector == #selector(NSResponder.cancelOperation(_:)) {
+                closeFindBar(nil)
+                return true
+            }
+        }
+
+        return false
+    }
 }
 
 // MARK: - NSSplitViewDelegate
 
 extension ViewController: NSSplitViewDelegate {
     func splitView(_ splitView: NSSplitView, constrainMinCoordinate proposedMinimumPosition: CGFloat, ofSubviewAt index: Int) -> CGFloat {
-        return index == 0 ? 120 : proposedMinimumPosition
+        return index == 0 ? CGFloat(AppSettings.minSidebarWidth) : proposedMinimumPosition
     }
 
     func splitView(_ splitView: NSSplitView, constrainMaxCoordinate proposedMaximumPosition: CGFloat, ofSubviewAt index: Int) -> CGFloat {
-        return index == 0 ? max(120, splitView.bounds.width - 150) : proposedMaximumPosition
+        return index == 0 ? max(CGFloat(AppSettings.minSidebarWidth), splitView.bounds.width - 150) : proposedMaximumPosition
+    }
+
+    func splitViewDidResizeSubviews(_ notification: Notification) {
+        syncProfileColumnWidth()
+        guard !isApplyingStoredSidebarWidth,
+              let sidebar = splitView.subviews.first else { return }
+        settings.sidebarWidth = Double(sidebar.frame.width)
     }
 }
 
 extension ViewController: NSUserInterfaceValidations {
     func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {
         switch item.action {
-        case #selector(makeTextLarger(_:)), #selector(makeTextSmaller(_:)):
+        case #selector(makeTextLarger(_:)),
+             #selector(makeTextSmaller(_:)),
+             #selector(showFindBar(_:)),
+             #selector(showReplaceBar(_:)):
             return view.window?.contentViewController === self
+        case #selector(toggleCommentSelection(_:)):
+            return view.window?.contentViewController === self && canEditCurrentSelection
         default:
             return true
         }
@@ -717,6 +1045,13 @@ extension ViewController: ProfileTableViewContextMenuDelegate {
         toggleItem.target = self
         toggleItem.representedObject = id
         menu.addItem(toggleItem)
+
+        if profile.isRemote {
+            let refreshItem = NSMenuItem(title: "刷新", action: #selector(refreshRemoteFromContextMenu(_:)), keyEquivalent: "")
+            refreshItem.target = self
+            refreshItem.representedObject = id
+            menu.addItem(refreshItem)
+        }
 
         menu.addItem(NSMenuItem.separator())
 

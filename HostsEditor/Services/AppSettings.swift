@@ -32,10 +32,14 @@ final class AppSettings: ObservableObject {
     static let editorFontSizeStep: Double = 1
     static let minEditorFontSize: Double = 11
     static let maxEditorFontSize: Double = 24
+    static let defaultSidebarWidth: Double = 220
+    static let minSidebarWidth: Double = 160
+    static let maxSidebarWidth: Double = 420
 
     private enum Keys {
         static let updateCheckStrategy = "HostsEditorUpdateCheckStrategy"
         static let editorFontSize = "HostsEditorEditorFontSize"
+        static let sidebarWidth = "HostsEditorSidebarWidth"
     }
 
     @Published var updateCheckStrategy: UpdateCheckStrategy {
@@ -57,6 +61,18 @@ final class AppSettings: ObservableObject {
         }
     }
 
+    @Published var sidebarWidth: Double {
+        didSet {
+            let clampedValue = Self.clampedSidebarWidth(sidebarWidth)
+            if sidebarWidth != clampedValue {
+                sidebarWidth = clampedValue
+                return
+            }
+            guard oldValue != sidebarWidth else { return }
+            UserDefaults.standard.set(sidebarWidth, forKey: Keys.sidebarWidth)
+        }
+    }
+
     private init() {
         if let rawValue = UserDefaults.standard.string(forKey: Keys.updateCheckStrategy),
            let strategy = UpdateCheckStrategy(rawValue: rawValue) {
@@ -70,11 +86,18 @@ final class AppSettings: ObservableObject {
         } else {
             editorFontSize = Self.defaultEditorFontSize
         }
+
+        if UserDefaults.standard.object(forKey: Keys.sidebarWidth) != nil {
+            sidebarWidth = Self.clampedSidebarWidth(UserDefaults.standard.double(forKey: Keys.sidebarWidth))
+        } else {
+            sidebarWidth = Self.defaultSidebarWidth
+        }
     }
 
     func resetToDefaults() {
         updateCheckStrategy = Self.defaultUpdateCheckStrategy
         editorFontSize = Self.defaultEditorFontSize
+        sidebarWidth = Self.defaultSidebarWidth
     }
 
     func adjustEditorFontSize(by delta: Double) {
@@ -87,5 +110,9 @@ final class AppSettings: ObservableObject {
 
     static func adjustedEditorFontSize(_ pointSize: Double, delta: Double) -> Double {
         clampedEditorFontSize(pointSize + delta)
+    }
+
+    static func clampedSidebarWidth(_ width: Double) -> Double {
+        min(max(width.rounded(), minSidebarWidth), maxSidebarWidth)
     }
 }

@@ -83,6 +83,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         editMenu.addItem(NSMenuItem(title: "删除", action: #selector(NSText.delete(_:)), keyEquivalent: ""))
         editMenu.addItem(NSMenuItem.separator())
         editMenu.addItem(NSMenuItem(title: "全选", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a"))
+        editMenu.addItem(NSMenuItem.separator())
+        editMenu.addItem(NSMenuItem(title: "查找", action: #selector(ViewController.showFindBar(_:)), keyEquivalent: "f"))
+        editMenu.addItem(NSMenuItem(title: "替换", action: #selector(ViewController.showReplaceBar(_:)), keyEquivalent: "r"))
+        let toggleCommentItem = NSMenuItem(title: "切换注释", action: #selector(ViewController.toggleCommentSelection(_:)), keyEquivalent: "/")
+        toggleCommentItem.keyEquivalentModifierMask = [.command]
+        editMenu.addItem(toggleCommentItem)
+        editMenu.addItem(NSMenuItem.separator())
         let enlargeTextItem = NSMenuItem(title: "增大字体", action: #selector(ViewController.makeTextLarger(_:)), keyEquivalent: "+")
         enlargeTextItem.keyEquivalentModifierMask = [.command]
         editMenu.addItem(enlargeTextItem)
@@ -364,7 +371,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupStatusBar() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = statusItem?.button {
-            button.image = NSImage(systemSymbolName: "network", accessibilityDescription: "Hosts")
+            let image = NSImage(systemSymbolName: "server.rack", accessibilityDescription: "HostsEditor")
+            image?.isTemplate = true
+            button.image = image
+            button.imageScaling = .scaleProportionallyDown
         }
         statusMenu = NSMenu()
         statusMenu?.addItem(NSMenuItem(title: "打开 HostsEditor", action: #selector(openMainWindow), keyEquivalent: ""))
