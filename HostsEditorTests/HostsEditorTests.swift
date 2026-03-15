@@ -5,6 +5,7 @@
 //  Created by VanJay on 2026/3/9.
 //
 
+import AppKit
 import Foundation
 import Testing
 @testable import HostsEditor
@@ -78,6 +79,32 @@ struct HostsEditorTests {
         )
 
         #expect(result.text == "127.0.0.1 bar.test\n127.0.0.1 bar.test")
+    }
+
+    @MainActor
+    @Test func deleteShortcutDoesNotFireWhileFieldEditorIsActive() async throws {
+        let fieldEditor = NSTextView()
+
+        #expect(
+            ViewController.isEditingTextInput(
+                responder: fieldEditor,
+                editorTextView: nil,
+                editorContainerView: nil
+            )
+        )
+    }
+
+    @MainActor
+    @Test func deleteShortcutStillWorksWhenNoTextInputIsFocused() async throws {
+        let nonEditingResponder = NSView()
+
+        #expect(
+            !ViewController.isEditingTextInput(
+                responder: nonEditingResponder,
+                editorTextView: nil,
+                editorContainerView: nil
+            )
+        )
     }
 
 }

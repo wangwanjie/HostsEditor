@@ -153,7 +153,11 @@ class ViewController: NSViewController {
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self else { return event }
             if event.keyCode == 51, case .profile = self.selection {
-                if let fr = self.view.window?.firstResponder as? NSView, fr === self.editorTextView || fr.isDescendant(of: self.editorScroll) {
+                if Self.isEditingTextInput(
+                    responder: self.view.window?.firstResponder,
+                    editorTextView: self.editorTextView,
+                    editorContainerView: self.editorScroll
+                ) {
                     return event
                 }
                 self.removeProfile()
@@ -1064,7 +1068,24 @@ extension ViewController: ProfileTableViewContextMenuDelegate {
     }
 }
 
-private extension ViewController {
+extension ViewController {
+    static func isEditingTextInput(
+        responder: NSResponder?,
+        editorTextView: NSTextView?,
+        editorContainerView: NSView?
+    ) -> Bool {
+        if responder is NSTextView {
+            return true
+        }
+
+        guard let view = responder as? NSView else { return false }
+        if let editorTextView, view === editorTextView {
+            return true
+        }
+
+        return editorContainerView.map { view.isDescendant(of: $0) } ?? false
+    }
+
     func makeSectionHeaderCell(title: String) -> NSTableCellView {
         let cell = NSTableCellView()
         let label = NSTextField(labelWithString: title)
