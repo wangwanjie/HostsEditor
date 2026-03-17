@@ -35,22 +35,48 @@ guard CommandLine.arguments.count >= 2 else {
 let outputPath = CommandLine.arguments[1]
 let size = NSSize(width: 620, height: 360)
 let rect = NSRect(origin: .zero, size: size)
+let backgroundColor = NSColor(calibratedRed: 0.96, green: 0.97, blue: 0.99, alpha: 1)
+let headerTopColor = NSColor(calibratedRed: 0.87, green: 0.93, blue: 0.99, alpha: 1)
+let headerMidColor = NSColor(calibratedRed: 0.91, green: 0.95, blue: 0.99, alpha: 1)
+let panelStrokeColor = NSColor(calibratedRed: 0.80, green: 0.85, blue: 0.92, alpha: 0.9)
+let accentColor = NSColor(calibratedRed: 0.24, green: 0.53, blue: 0.92, alpha: 1)
+let badgeFillColor = NSColor(calibratedRed: 0.90, green: 0.95, blue: 1.0, alpha: 1)
+let headerBottomY: CGFloat = 220
+let leftPanel = NSRect(x: 58, y: 72, width: 192, height: 168)
+let rightPanel = NSRect(x: 370, y: 72, width: 192, height: 168)
+let badgeSize: CGFloat = 54
+let badgeMidOffset: CGFloat = 53
+let badge1Rect = NSRect(
+    x: (leftPanel.maxX + rightPanel.minX) / 2 - badgeMidOffset - badgeSize / 2,
+    y: leftPanel.midY - badgeSize / 2,
+    width: badgeSize,
+    height: badgeSize
+)
+let badge2Rect = NSRect(
+    x: (leftPanel.maxX + rightPanel.minX) / 2 + badgeMidOffset - badgeSize / 2,
+    y: rightPanel.midY - badgeSize / 2,
+    width: badgeSize,
+    height: badgeSize
+)
+let connectorY = leftPanel.midY
 
 let image = NSImage(size: size)
 image.lockFocus()
 
 let outer = NSBezierPath(roundedRect: rect, xRadius: 24, yRadius: 24)
-NSColor(calibratedRed: 0.96, green: 0.97, blue: 0.99, alpha: 1).setFill()
+backgroundColor.setFill()
 outer.fill()
 
-let topBand = NSRect(x: 0, y: 258, width: size.width, height: 102)
-let bandPath = NSBezierPath(roundedRect: topBand, xRadius: 24, yRadius: 24)
-NSColor(calibratedRed: 0.87, green: 0.93, blue: 0.99, alpha: 1).setFill()
-bandPath.fill()
-
-let topMask = NSRect(x: 0, y: 258, width: size.width, height: 50)
-NSColor(calibratedRed: 0.87, green: 0.93, blue: 0.99, alpha: 1).setFill()
-topMask.fill()
+NSGraphicsContext.saveGraphicsState()
+outer.addClip()
+let headerRect = NSRect(x: 0, y: headerBottomY, width: size.width, height: size.height - headerBottomY)
+let headerGradient = NSGradient(colorsAndLocations:
+    (headerTopColor, 0.0),
+    (headerMidColor, 0.55),
+    (backgroundColor, 1.0)
+)
+headerGradient?.draw(in: headerRect, angle: -90)
+NSGraphicsContext.restoreGraphicsState()
 
 func drawText(_ text: String, rect: NSRect, font: NSFont, color: NSColor, alignment: NSTextAlignment = .center) {
     let paragraph = NSMutableParagraphStyle()
@@ -60,7 +86,22 @@ func drawText(_ text: String, rect: NSRect, font: NSFont, color: NSColor, alignm
         .foregroundColor: color,
         .paragraphStyle: paragraph
     ]
-    text.draw(in: rect, withAttributes: attributes)
+    let attributedText = NSAttributedString(string: text, attributes: attributes)
+    let options: NSString.DrawingOptions = [.usesLineFragmentOrigin, .usesFontLeading]
+    var textBounds = attributedText.boundingRect(
+        with: NSSize(width: rect.width, height: .greatestFiniteMagnitude),
+        options: options
+    )
+    textBounds.size.width = ceil(textBounds.width)
+    textBounds.size.height = ceil(textBounds.height)
+
+    let drawRect = NSRect(
+        x: rect.minX,
+        y: rect.minY + (rect.height - textBounds.height) / 2,
+        width: rect.width,
+        height: textBounds.height
+    )
+    attributedText.draw(with: drawRect, options: options)
 }
 
 func drawPanel(_ rect: NSRect) {
@@ -68,64 +109,64 @@ func drawPanel(_ rect: NSRect) {
     NSColor(calibratedWhite: 1.0, alpha: 0.9).setFill()
     panel.fill()
 
-    NSColor(calibratedRed: 0.80, green: 0.85, blue: 0.92, alpha: 0.9).setStroke()
+    panelStrokeColor.setStroke()
     panel.lineWidth = 2
     panel.stroke()
 }
 
-drawPanel(NSRect(x: 58, y: 72, width: 192, height: 168))
-drawPanel(NSRect(x: 370, y: 72, width: 192, height: 168))
+drawPanel(leftPanel)
+drawPanel(rightPanel)
 
 let arrowPath = NSBezierPath()
-arrowPath.move(to: NSPoint(x: 272, y: 156))
-arrowPath.line(to: NSPoint(x: 356, y: 156))
+arrowPath.move(to: NSPoint(x: 272, y: connectorY))
+arrowPath.line(to: NSPoint(x: 356, y: connectorY))
 arrowPath.lineWidth = 14
 arrowPath.lineCapStyle = .round
-NSColor(calibratedRed: 0.24, green: 0.53, blue: 0.92, alpha: 1).setStroke()
+accentColor.setStroke()
 arrowPath.stroke()
 
 let head = NSBezierPath()
-head.move(to: NSPoint(x: 354, y: 178))
-head.line(to: NSPoint(x: 392, y: 156))
-head.line(to: NSPoint(x: 354, y: 134))
+head.move(to: NSPoint(x: 354, y: connectorY + 22))
+head.line(to: NSPoint(x: 392, y: connectorY))
+head.line(to: NSPoint(x: 354, y: connectorY - 22))
 head.close()
-NSColor(calibratedRed: 0.24, green: 0.53, blue: 0.92, alpha: 1).setFill()
+accentColor.setFill()
 head.fill()
 
 drawText(
     "Drag HostsEditor to Applications",
-    rect: NSRect(x: 60, y: 286, width: 500, height: 34),
+    rect: NSRect(x: 60, y: 282, width: 500, height: 42),
     font: NSFont(name: "Avenir Next Demi Bold", size: 26) ?? .systemFont(ofSize: 26, weight: .semibold),
     color: NSColor(calibratedRed: 0.09, green: 0.18, blue: 0.30, alpha: 1)
 )
 
 drawText(
     "Install by dragging the app onto the Applications shortcut",
-    rect: NSRect(x: 70, y: 250, width: 480, height: 24),
+    rect: NSRect(x: 70, y: 246, width: 480, height: 30),
     font: NSFont(name: "Avenir Next Regular", size: 14) ?? .systemFont(ofSize: 14, weight: .regular),
     color: NSColor(calibratedRed: 0.26, green: 0.34, blue: 0.45, alpha: 1)
 )
 
-let badge = NSBezierPath(roundedRect: NSRect(x: 230, y: 128, width: 54, height: 54), xRadius: 27, yRadius: 27)
-NSColor(calibratedRed: 0.90, green: 0.95, blue: 1.0, alpha: 1).setFill()
+let badge = NSBezierPath(roundedRect: badge1Rect, xRadius: 27, yRadius: 27)
+badgeFillColor.setFill()
 badge.fill()
 
 drawText(
     "1",
-    rect: NSRect(x: 245, y: 137, width: 24, height: 24),
+    rect: badge1Rect.offsetBy(dx: 0, dy: 1),
     font: .systemFont(ofSize: 22, weight: .bold),
-    color: NSColor(calibratedRed: 0.24, green: 0.53, blue: 0.92, alpha: 1)
+    color: accentColor
 )
 
-let badge2 = NSBezierPath(roundedRect: NSRect(x: 336, y: 128, width: 54, height: 54), xRadius: 27, yRadius: 27)
-NSColor(calibratedRed: 0.90, green: 0.95, blue: 1.0, alpha: 1).setFill()
+let badge2 = NSBezierPath(roundedRect: badge2Rect, xRadius: 27, yRadius: 27)
+badgeFillColor.setFill()
 badge2.fill()
 
 drawText(
     "2",
-    rect: NSRect(x: 351, y: 137, width: 24, height: 24),
+    rect: badge2Rect.offsetBy(dx: 0, dy: 1),
     font: .systemFont(ofSize: 22, weight: .bold),
-    color: NSColor(calibratedRed: 0.24, green: 0.53, blue: 0.92, alpha: 1)
+    color: accentColor
 )
 
 image.unlockFocus()
@@ -258,8 +299,8 @@ tell application "Finder"
         set text size of viewOptions to 13
         set background picture of viewOptions to file ".background:installer-background.png"
         set position of every item of container window to {760, 40}
-        set position of item "$app_name" of container window to {154, 180}
-        set position of item "Applications" of container window to {466, 180}
+        set position of item "$app_name" of container window to {154, 160}
+        set position of item "Applications" of container window to {466, 160}
         close
         open
         update without registering applications
