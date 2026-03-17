@@ -3,26 +3,37 @@
     <channel>
         <title>HostsEditor</title>
         <item>
+            <title>1.5.2</title>
+            <pubDate>Wed, 18 Mar 2026 01:03:24 +0800</pubDate>
+            <link>https://github.com/wangwanjie/HostsEditor/releases/tag/v1.5.2</link>
+            <sparkle:version>7</sparkle:version>
+            <sparkle:shortVersionString>1.5.2</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/wangwanjie/HostsEditor/releases/download/v1.5.2/HostsEditor_V_1.5.2.dmg" length="4754637" type="application/octet-stream" sparkle:edSignature="ab/S5/sJfZTgrOsawh+b+bsx+KKpV2E9FqhJkD207LfbjxUQp9Wrsy4e18DEIjR5BzDtNA96lZcjXQeFDJY/CQ==" />
+            <sparkle:deltas>
+                <enclosure url="https://raw.githubusercontent.com/wangwanjie/HostsEditor/main/HostsEditor7-6.delta" sparkle:deltaFrom="6" length="14190" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="2F5ymAMyOtc3DdnSBJd8uCVCOSM49ibDkH2t1juglAKlrWzTMW2WhERg2zzQcgrKUUQIftA9L1QtcNETjIb3CA==" />
+                <enclosure url="https://raw.githubusercontent.com/wangwanjie/HostsEditor/main/HostsEditor7-5.delta" sparkle:deltaFrom="5" length="87638" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="AX9Lf4BIyjzAYoeYOgA6HREavXPq4V2gjoA8ttt31kmrbCD/1pVdTWvVzEpqzQ7v8PS0ndguE9Bd1QVy71muCA==" />
+                <enclosure url="https://raw.githubusercontent.com/wangwanjie/HostsEditor/main/HostsEditor7-4.delta" sparkle:deltaFrom="4" length="263182" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="Ts7cT1ERJcigmK8Rag6HeLDuHNoTtK5tIerSfd+T1AZD/GCnl1Iv6X0yHto65BLJqM8T/djywW1UUWrI5pQ2Bw==" />
+                <enclosure url="https://raw.githubusercontent.com/wangwanjie/HostsEditor/main/HostsEditor7-3.delta" sparkle:deltaFrom="3" length="1244606" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="GzEa625kG+ENeHwCxwWf4DU9ygUBQAJxRjq37DirJIBrR9/DRAbTc0/Roq2BCvug09i7QBhWBW+/xuKdZmJdDg==" />
+                <enclosure url="https://raw.githubusercontent.com/wangwanjie/HostsEditor/main/HostsEditor7-2.delta" sparkle:deltaFrom="2" length="1408526" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="vSlIhp/sVr2xEc4KavNIvimHam+gdMwxm7wQl6oSvBWrDTfE0hqgxgm4GlmpwTELgNtZqY7Qppm7s2j5cDTZAg==" />
+            </sparkle:deltas>
+            <description>&lt;h1&gt;更新内容&lt;/h1&gt;
+&lt;ul&gt;&lt;li&gt;优化 DMG 安装界面的整体布局，让应用图标、Applications 快捷方式和步骤标记在各自区域内更居中。&lt;/li&gt;&lt;li&gt;改善安装引导文案与背景渐变的衔接，避免副标题被浅蓝分界线割开。&lt;/li&gt;&lt;/ul&gt;</description>
+        </item>
+        <item>
             <title>1.5.1</title>
-            <pubDate>Sun, 15 Mar 2026 22:17:06 +0800</pubDate>
+            <pubDate>Wed, 18 Mar 2026 01:03:24 +0800</pubDate>
             <link>https://github.com/wangwanjie/HostsEditor/releases/tag/v1.5.1</link>
             <sparkle:version>6</sparkle:version>
             <sparkle:shortVersionString>1.5.1</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
             <enclosure url="https://github.com/wangwanjie/HostsEditor/releases/download/v1.5.1/HostsEditor_V_1.5.1.dmg" length="4763555" type="application/octet-stream" sparkle:edSignature="+wd0so1IDAE7AePM6ydI6X5rhbtrsiGdD1jhF6qRJRSTmxrfWxqFKCre87CzDcipQX76TC8ef/3Yj6G8Y408AA==" />
-            <sparkle:deltas>
-                <enclosure url="https://raw.githubusercontent.com/wangwanjie/HostsEditor/main/HostsEditor6-5.delta" sparkle:deltaFrom="5" length="84150" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="dnaRwI6B+M8sfn6B3CI238cnnzlLgBmbFGzY+NJAwZZwPqNQidow6Ixlz8c4wiVS7Mfqvk0nYyJcSX4TGj5JCA==" />
-                <enclosure url="https://raw.githubusercontent.com/wangwanjie/HostsEditor/main/HostsEditor6-4.delta" sparkle:deltaFrom="4" length="262846" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="PYxoa1dpj2VozvlYoQPasvN5sCcZymTnIZSRJ8he2j94/tKRtJQNv6vj47CrIwCbwjNJObkhglSU7Ish0u1uBg==" />
-                <enclosure url="https://raw.githubusercontent.com/wangwanjie/HostsEditor/main/HostsEditor6-3.delta" sparkle:deltaFrom="3" length="1242934" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="qzT2CopR+ycao3MqkP/FBQzHT3D4Vk7RvP2EE0VZVDQznGJJTpfFCjI9lZTTRaBbohZIRcKsFzEJueeNrQSECQ==" />
-                <enclosure url="https://raw.githubusercontent.com/wangwanjie/HostsEditor/main/HostsEditor6-2.delta" sparkle:deltaFrom="2" length="1408726" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="Dt+44pljzn0D6VpadoOh5JXedwqJp5JmVVcCU754pvNVJrHuN+5qxMDgdZ6kYH0D7QRNhrf5GYK0dH0hzGd9BA==" />
-                <enclosure url="https://raw.githubusercontent.com/wangwanjie/HostsEditor/main/HostsEditor6-1.delta" sparkle:deltaFrom="1" length="474702" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="1vlz6SpFHfny2rhzbA0c925ZseKRawCTNH6qDUZux19MQVdpOdTF0Lye4XqqLFwlgy269tbgzBSnKMkc1lPlAQ==" />
-            </sparkle:deltas>
             <description>&lt;h1&gt;更新内容&lt;/h1&gt;
 &lt;ul&gt;&lt;li&gt;修复主界面配置列表宽度在重启后回退为默认值的问题，现在会正确记住上次调整结果。&lt;/li&gt;&lt;li&gt;修复查找与替换栏在窗口较窄时触发 Auto Layout 约束冲突的问题，布局会按可用空间自动收缩。&lt;/li&gt;&lt;li&gt;补充对应回归测试，避免侧栏宽度持久化和查找栏布局问题再次回归。&lt;/li&gt;&lt;/ul&gt;</description>
         </item>
         <item>
             <title>1.5</title>
-            <pubDate>Sun, 15 Mar 2026 22:17:06 +0800</pubDate>
+            <pubDate>Wed, 18 Mar 2026 01:03:24 +0800</pubDate>
             <link>https://github.com/wangwanjie/HostsEditor/releases/tag/v1.5</link>
             <sparkle:version>5</sparkle:version>
             <sparkle:shortVersionString>1.5</sparkle:shortVersionString>
@@ -30,17 +41,6 @@
             <enclosure url="https://github.com/wangwanjie/HostsEditor/releases/download/v1.5/HostsEditor_V_1.5.dmg" length="4762434" type="application/octet-stream" sparkle:edSignature="kcRUxqVsbW3kqq8MXiw0CmOOTaaTpZsUwM5OPN/4G8iv2VhzF5kKir71G1x7H54jL1pyn3DqbEhIRNFLvSJYCQ==" />
             <description>&lt;h1&gt;更新内容&lt;/h1&gt;
 &lt;ul&gt;&lt;li&gt;主界面的配置列表宽度现在会记住上次调整结果，远程配置右键菜单也补充了“刷新”，状态栏图标换成了更贴近 hosts 编辑的样式。&lt;/li&gt;&lt;li&gt;Hosts 编辑器新增 `Command + /` 行注释切换，以及类 VS Code 的内联查找与替换；只读内容支持查找，切换配置时会同步刷新查找结果。&lt;/li&gt;&lt;li&gt;修复了编辑配置名称、远程配置 URL 和查找替换输入框时按退格键会误触发“删除配置”确认弹窗的问题。&lt;/li&gt;&lt;li&gt;禁用的 hosts 条目改用更易区分的配色，配合新的查找高亮与替换操作，批量检查和调整映射更直观。&lt;/li&gt;&lt;/ul&gt;</description>
-        </item>
-        <item>
-            <title>1.4</title>
-            <pubDate>Sun, 15 Mar 2026 22:17:06 +0800</pubDate>
-            <link>https://github.com/wangwanjie/HostsEditor/releases/tag/v1.4</link>
-            <sparkle:version>4</sparkle:version>
-            <sparkle:shortVersionString>1.4</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
-            <enclosure url="https://github.com/wangwanjie/HostsEditor/releases/download/v1.4/HostsEditor_V_1.4.dmg" length="4647728" type="application/octet-stream" sparkle:edSignature="V1KR6XfjI4cP1dy3/vtJ5oUipvCZN1qGvAwTnrhPNCikcEBt3uazD/TLIyWjoPq75OQuUIitx/wpNlUP2O6YCQ==" />
-            <description>&lt;h1&gt;更新内容&lt;/h1&gt;
-&lt;ul&gt;&lt;li&gt;Hosts 内容页现已支持 `Command` 配合 `+` / `-` 快速增大或减小字体，阅读和比对长 hosts 内容更方便。&lt;/li&gt;&lt;li&gt;快捷键与偏好设置中的字体大小保持同步，并继续遵循最小/最大字号限制，避免误调到不可用范围。&lt;/li&gt;&lt;/ul&gt;</description>
         </item>
         <link>https://github.com/wangwanjie/HostsEditor</link>
         <description>HostsEditor release feed.</description>
