@@ -19,6 +19,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var shouldRetryPendingOperationAfterActivation = false
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
+        DebugRuntime.start()
+        
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handleHelperInterventionNotification(_:)),
