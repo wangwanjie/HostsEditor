@@ -17,7 +17,7 @@ enum HostsWriteVerificationError: Error, LocalizedError {
     case contentMismatch
 
     var errorDescription: String? {
-        "系统 hosts 写入后校验失败，文件内容未更新"
+        L10n.tr("hosts.error.write_verification")
     }
 }
 
@@ -62,10 +62,10 @@ final class HostsManager: ObservableObject {
     func loadProfiles() {
         guard let data = UserDefaults.standard.data(forKey: profilesKey),
               let decoded = try? JSONDecoder().decode([HostsProfile].self, from: data) else {
-            profiles = [HostsProfile(name: "点击可更改配置名称", content: "")]
+            profiles = [HostsProfile(name: L10n.tr("hosts.default_profile_name"), content: "")]
             return
         }
-        profiles = decoded.isEmpty ? [HostsProfile(name: "点击可更改配置名称", content: "")] : decoded
+        profiles = decoded.isEmpty ? [HostsProfile(name: L10n.tr("hosts.default_profile_name"), content: "")] : decoded
     }
 
     func saveProfiles() {
@@ -110,7 +110,7 @@ final class HostsManager: ObservableObject {
             return true
         } catch {
             queuePendingPrivilegedOperation(.deleteProfile(id: id), for: error)
-            handlePrivilegedOperationError(error, operation: "删除配置")
+            handlePrivilegedOperationError(error, operation: L10n.tr("operation.delete_profile"))
             return false
         }
     }
@@ -126,7 +126,7 @@ final class HostsManager: ObservableObject {
             profiles = previousProfiles
             saveProfiles()
             queuePendingPrivilegedOperation(.setProfileEnabled(id: id, enabled: enabled), for: error)
-            handlePrivilegedOperationError(error, operation: "应用配置")
+            handlePrivilegedOperationError(error, operation: L10n.tr("operation.apply_profiles"))
         }
     }
 
@@ -145,7 +145,7 @@ final class HostsManager: ObservableObject {
             UserDefaults.standard.set(base, forKey: baseContentKey)
             errorMessage = nil
         } catch {
-            handlePrivilegedOperationError(error, operation: "读取系统 hosts")
+            handlePrivilegedOperationError(error, operation: L10n.tr("operation.read_system_hosts"))
         }
     }
 
@@ -161,7 +161,7 @@ final class HostsManager: ObservableObject {
             errorMessage = nil
         } catch {
             queuePendingPrivilegedOperation(.writeSystemContent(content), for: error)
-            handlePrivilegedOperationError(error, operation: "写入系统 hosts")
+            handlePrivilegedOperationError(error, operation: L10n.tr("operation.write_system_hosts"))
         }
     }
 
@@ -173,7 +173,7 @@ final class HostsManager: ObservableObject {
             try await applyComposedHosts()
         } catch {
             queuePendingPrivilegedOperation(.writeComposedHosts, for: error)
-            handlePrivilegedOperationError(error, operation: "应用配置")
+            handlePrivilegedOperationError(error, operation: L10n.tr("operation.apply_profiles"))
         }
     }
 
@@ -230,13 +230,13 @@ final class HostsManager: ObservableObject {
     func fetchRemoteHosts(urlString: String) async -> Result<String, Error> {
         guard let url = URL(string: urlString) else {
             return .failure(NSError(domain: "HostsEditor", code: -1,
-                                    userInfo: [NSLocalizedDescriptionKey: "无效的 URL"]))
+                                    userInfo: [NSLocalizedDescriptionKey: L10n.tr("hosts.error.invalid_url")]))
         }
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
             guard let text = String(data: data, encoding: .utf8) else {
                 return .failure(NSError(domain: "HostsEditor", code: -2,
-                                        userInfo: [NSLocalizedDescriptionKey: "无法解码为 UTF-8"]))
+                                        userInfo: [NSLocalizedDescriptionKey: L10n.tr("hosts.error.invalid_utf8")]))
             }
             return .success(text)
         } catch {
@@ -246,10 +246,10 @@ final class HostsManager: ObservableObject {
 
     /// 从 URL 生成远程方案默认名称：☁️-文件名（去后缀）
     static func defaultRemoteProfileName(from urlString: String) -> String {
-        guard let url = URL(string: urlString) else { return "☁️-hosts" }
+        guard let url = URL(string: urlString) else { return "☁️-\(L10n.tr("hosts.remote_default_name"))" }
         let filename = url.lastPathComponent
         let nameWithoutExt = (filename as NSString).deletingPathExtension
-        return nameWithoutExt.isEmpty ? "☁️-hosts" : "☁️-\(nameWithoutExt)"
+        return nameWithoutExt.isEmpty ? "☁️-\(L10n.tr("hosts.remote_default_name"))" : "☁️-\(nameWithoutExt)"
     }
 
     func addRemoteProfile(urlString: String) async {
@@ -267,7 +267,7 @@ final class HostsManager: ObservableObject {
             addProfile(profile)
             errorMessage = nil
         case .failure(let error):
-            errorMessage = "拉取远程配置失败: \(error.localizedDescription)"
+            errorMessage = L10n.tr("hosts.error.remote_fetch", error.localizedDescription)
         }
     }
 
@@ -286,7 +286,7 @@ final class HostsManager: ObservableObject {
             }
             errorMessage = nil
         case .failure(let error):
-            errorMessage = "刷新失败: \(error.localizedDescription)"
+            errorMessage = L10n.tr("hosts.error.remote_refresh", error.localizedDescription)
         }
     }
 
@@ -345,7 +345,7 @@ final class HostsManager: ObservableObject {
     }
 
     private func handlePrivilegedOperationError(_ error: Error, operation: String) {
-        errorMessage = "\(operation)失败: \(error.localizedDescription)"
+        errorMessage = L10n.tr("common.operation_failed", operation, error.localizedDescription)
 
         guard let kind = helperInterventionKind(for: error) else { return }
         NotificationCenter.default.post(

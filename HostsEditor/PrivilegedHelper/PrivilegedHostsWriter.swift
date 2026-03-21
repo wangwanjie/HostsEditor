@@ -25,17 +25,17 @@ enum PrivilegedHostsError: Error, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .requiresApproval:
-            return "需要在“系统设置 -> 通用 -> 登录项与扩展程序”中允许后台帮助程序"
+            return L10n.tr("helper.alert.approval.message")
         case .disabledByUser:
-            return "后台帮助程序已停用，请在“帮助”菜单中重新启用后再写入 hosts"
+            return L10n.tr("helper.alert.disabled.title")
         case .registrationFailed(let message):
-            return message.isEmpty ? "后台帮助程序注册失败" : message
+            return message.isEmpty ? L10n.tr("helper.alert.enable_failed.title") : message
         case .repairRequired(let message):
-            return message.isEmpty ? "后台帮助程序需要修复" : message
+            return message.isEmpty ? L10n.tr("helper.alert.repair_required.title") : message
         case .connectionFailed:
-            return "无法连接帮助程序"
+            return L10n.tr("helper.error.connection_failed")
         case .timeout:
-            return "连接超时"
+            return L10n.tr("helper.error.timeout")
         }
     }
 }
@@ -61,14 +61,14 @@ private struct HelperLaunchdState {
 
     var recoveryMessage: String {
         if let programIdentifier, programIdentifier != helperProgramIdentifier {
-            return "系统当前记录的后台帮助程序路径与当前安装包不一致。请先清理旧登录项或后台任务记录，再重新运行当前构建后点击“启用或修复后台帮助程序”。"
+            return L10n.tr("helper.error.recovery_path_mismatch")
         }
 
         if needsLWCRUpdate {
-            return "macOS 仍在使用旧的后台任务注册记录。请先停用后台帮助程序，再重新启用；若仍失败，请清理旧登录项/后台任务记录后重试。"
+            return L10n.tr("helper.error.recovery_lwcr_update")
         }
 
-        return "后台帮助程序已注册，但 macOS 拉起该进程时仍然失败。请在“帮助”菜单中手动执行一次“启用或修复后台帮助程序”。"
+        return L10n.tr("helper.error.recovery_spawn_failed")
     }
 
     private func value(after prefix: String) -> String? {
@@ -145,7 +145,7 @@ final class PrivilegedHostsWriter {
         try await unregisterHelper()
 
         guard await waitForHelperUnregistered() else {
-            throw PrivilegedHostsError.registrationFailed("后台帮助程序仍在卸载中，请稍后再试")
+            throw PrivilegedHostsError.registrationFailed(L10n.tr("helper.error.uninstall_in_progress"))
         }
 
         setHelperExplicitlyDisabled(true)
@@ -257,7 +257,7 @@ final class PrivilegedHostsWriter {
         case .requiresApproval:
             throw PrivilegedHostsError.requiresApproval
         @unknown default:
-            throw PrivilegedHostsError.registrationFailed("检测到未知的后台帮助程序状态")
+            throw PrivilegedHostsError.registrationFailed(L10n.tr("helper.error.unknown_status"))
         }
 
         if daemonStatus == .requiresApproval {
@@ -265,7 +265,7 @@ final class PrivilegedHostsWriter {
         }
 
         guard daemonStatus == .enabled else {
-            throw PrivilegedHostsError.registrationFailed("后台帮助程序未处于可用状态")
+            throw PrivilegedHostsError.registrationFailed(L10n.tr("helper.error.not_enabled"))
         }
 
         guard await waitForHelperReachable() else {
@@ -427,7 +427,7 @@ final class PrivilegedHostsWriter {
             return .requiresApproval
         }
 
-        let message = error?.localizedDescription ?? "无法注册后台帮助程序"
+        let message = error?.localizedDescription ?? L10n.tr("helper.alert.enable_failed.title")
         return .registrationFailed(message)
     }
 

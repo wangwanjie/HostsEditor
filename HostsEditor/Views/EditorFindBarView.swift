@@ -10,12 +10,12 @@ final class EditorFindBarView: NSVisualEffectView {
     let findField = NSSearchField()
     let replaceField = NSTextField()
     let matchCountLabel = NSTextField(labelWithString: "")
-    let previousButton = EditorFindBarView.makeSymbolButton(systemName: "chevron.up", description: "上一个结果")
-    let nextButton = EditorFindBarView.makeSymbolButton(systemName: "chevron.down", description: "下一个结果")
-    let replaceToggleButton = NSButton(title: "替换", target: nil, action: nil)
-    let replaceButton = NSButton(title: "替换", target: nil, action: nil)
-    let replaceAllButton = NSButton(title: "全部替换", target: nil, action: nil)
-    let closeButton = EditorFindBarView.makeSymbolButton(systemName: "xmark", description: "关闭查找")
+    let previousButton = EditorFindBarView.makeSymbolButton(systemName: "chevron.up")
+    let nextButton = EditorFindBarView.makeSymbolButton(systemName: "chevron.down")
+    let replaceToggleButton = NSButton(title: "", target: nil, action: nil)
+    let replaceButton = NSButton(title: "", target: nil, action: nil)
+    let replaceAllButton = NSButton(title: "", target: nil, action: nil)
+    let closeButton = EditorFindBarView.makeSymbolButton(systemName: "xmark")
 
     private let findRow = NSView()
     private let replaceRow = NSView()
@@ -33,6 +33,7 @@ final class EditorFindBarView: NSVisualEffectView {
         translatesAutoresizingMaskIntoConstraints = false
 
         buildUI()
+        applyLocalization()
         setReplaceVisible(false)
         updateMatchCount(current: nil, total: 0)
     }
@@ -61,16 +62,28 @@ final class EditorFindBarView: NSVisualEffectView {
         }
         matchCountLabel.stringValue = "\(current)/\(total)"
     }
+
+    func applyLocalization() {
+        findField.placeholderString = L10n.findPlaceholder
+        replaceField.placeholderString = L10n.replacePlaceholder
+        replaceToggleButton.title = L10n.replaceButton
+        replaceButton.title = L10n.replaceButton
+        replaceAllButton.title = L10n.replaceAllButton
+        previousButton.toolTip = L10n.accessibilityPreviousResult
+        previousButton.setAccessibilityLabel(L10n.accessibilityPreviousResult)
+        nextButton.toolTip = L10n.accessibilityNextResult
+        nextButton.setAccessibilityLabel(L10n.accessibilityNextResult)
+        closeButton.toolTip = L10n.accessibilityCloseFind
+        closeButton.setAccessibilityLabel(L10n.accessibilityCloseFind)
+    }
 }
 
 private extension EditorFindBarView {
     func buildUI() {
-        findField.placeholderString = "查找"
         findField.focusRingType = .none
         findField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         findField.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
-        replaceField.placeholderString = "替换"
         replaceField.focusRingType = .none
         replaceField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         replaceField.setContentHuggingPriority(.defaultLow, for: .horizontal)
@@ -156,15 +169,14 @@ private extension EditorFindBarView {
         }
     }
 
-    static func makeSymbolButton(systemName: String, description: String) -> NSButton {
-        let image = NSImage(systemSymbolName: systemName, accessibilityDescription: description)
+    static func makeSymbolButton(systemName: String) -> NSButton {
+        let image = NSImage(systemSymbolName: systemName, accessibilityDescription: nil)
         image?.isTemplate = true
 
         let button = NSButton(image: image ?? NSImage(), target: nil, action: nil)
         button.bezelStyle = .texturedRounded
         button.imageScaling = .scaleProportionallyDown
         button.contentTintColor = .secondaryLabelColor
-        button.setAccessibilityLabel(description)
         return button
     }
 }

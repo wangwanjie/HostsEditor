@@ -46,6 +46,7 @@ class ViewController: NSViewController {
     private var refreshRemoteButton: NSButton!
     private var errorLabel: NSTextField!
     private var addRemotePopover: NSPopover?
+    private var remoteURLLabel: NSTextField?
     private var remoteURLField: NSTextField!
     private var addRemoteConfirmButton: NSButton!
     private var keyMonitor: Any?
@@ -138,6 +139,7 @@ class ViewController: NSViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         buildUI()
+        applyLocalization()
         setupBindings()
 
         editorTextView.string = manager.currentSystemContent
@@ -267,7 +269,7 @@ class ViewController: NSViewController {
         sidebar.wantsLayer = true
 
         sidebarColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("Profile"))
-        sidebarColumn.title = "方案"
+        sidebarColumn.title = L10n.mainProfiles
         sidebarColumn.width = max(180, sidebarWidth - 20)
         sidebarColumn.resizingMask = .autoresizingMask
 
@@ -290,11 +292,11 @@ class ViewController: NSViewController {
         sidebarScroll.borderType = .noBorder
         sidebar.addSubview(sidebarScroll)
 
-        addProfileButton = NSButton(title: "新建", target: self, action: #selector(showNewProfileMenu))
+        addProfileButton = NSButton(title: L10n.mainAdd, target: self, action: #selector(showNewProfileMenu))
         addProfileButton.bezelStyle = .rounded
         sidebar.addSubview(addProfileButton)
 
-        removeProfileButton = NSButton(title: "删除", target: self, action: #selector(removeProfile))
+        removeProfileButton = NSButton(title: L10n.mainDelete, target: self, action: #selector(removeProfile))
         removeProfileButton.bezelStyle = .rounded
         sidebar.addSubview(removeProfileButton)
 
@@ -352,16 +354,16 @@ class ViewController: NSViewController {
         findBarView.closeButton.action = #selector(closeFindBar(_:))
         right.addSubview(findBarView)
 
-        applyButton = NSButton(title: "保存并应用", target: self, action: #selector(saveAndApply))
+        applyButton = NSButton(title: L10n.mainSaveAndApply, target: self, action: #selector(saveAndApply))
         applyButton.bezelStyle = .rounded
         applyButton.keyEquivalent = "\r"
         right.addSubview(applyButton)
 
-        refreshButton = NSButton(title: "刷新", target: self, action: #selector(refreshCurrentHosts))
+        refreshButton = NSButton(title: L10n.mainRefresh, target: self, action: #selector(refreshCurrentHosts))
         refreshButton.bezelStyle = .rounded
         right.addSubview(refreshButton)
 
-        refreshRemoteButton = NSButton(title: "刷新远程", target: self, action: #selector(refreshRemote))
+        refreshRemoteButton = NSButton(title: L10n.mainRefreshRemote, target: self, action: #selector(refreshRemote))
         refreshRemoteButton.bezelStyle = .rounded
         right.addSubview(refreshRemoteButton)
 
@@ -444,6 +446,28 @@ class ViewController: NSViewController {
                 self?.editorTextView.applyEditorFontSize(CGFloat(pointSize))
             }
             .store(in: &cancellables)
+
+        AppLocalization.shared.$language
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.applyLocalization()
+            }
+            .store(in: &cancellables)
+    }
+
+    private func applyLocalization() {
+        guard sidebarColumn != nil else { return }
+        sidebarColumn.title = L10n.mainProfiles
+        addProfileButton.title = L10n.mainAdd
+        removeProfileButton.title = L10n.mainDelete
+        applyButton.title = L10n.mainSaveAndApply
+        refreshButton.title = L10n.mainRefresh
+        refreshRemoteButton.title = L10n.mainRefreshRemote
+        findBarView.applyLocalization()
+        remoteURLLabel?.stringValue = L10n.mainRemoteURL
+        remoteURLField?.placeholderString = L10n.mainRemoteURLPlaceholder
+        addRemoteConfirmButton?.title = L10n.mainAddRemoteConfirm
+        profileTableView?.reloadData()
     }
 
     private func reloadTablePreservingSelection() {
@@ -704,9 +728,9 @@ class ViewController: NSViewController {
 
     @objc private func showNewProfileMenu() {
         let menu = NSMenu()
-        let localItem = NSMenuItem(title: "本地方案", action: #selector(addLocalProfile), keyEquivalent: "")
+        let localItem = NSMenuItem(title: L10n.mainLocalProfile, action: #selector(addLocalProfile), keyEquivalent: "")
         localItem.target = self
-        let remoteItem = NSMenuItem(title: "远程方案", action: #selector(showAddRemotePopover), keyEquivalent: "")
+        let remoteItem = NSMenuItem(title: L10n.mainRemoteProfile, action: #selector(showAddRemotePopover), keyEquivalent: "")
         remoteItem.target = self
         menu.addItem(localItem)
         menu.addItem(remoteItem)
@@ -714,7 +738,7 @@ class ViewController: NSViewController {
     }
 
     @objc private func addLocalProfile() {
-        let profile = HostsProfile(name: "新方案", content: "")
+        let profile = HostsProfile(name: L10n.mainNewProfileName, content: "")
         manager.addProfile(profile)
         selection = .profile(profile.id)
     }
@@ -723,14 +747,15 @@ class ViewController: NSViewController {
         let content = NSView(frame: NSRect(x: 0, y: 0, width: 360, height: 56))
         content.wantsLayer = true
 
-        let label = NSTextField(labelWithString: "远程 URL：")
+        let label = NSTextField(labelWithString: L10n.mainRemoteURL)
+        remoteURLLabel = label
         content.addSubview(label)
 
         remoteURLField = NSTextField()
-        remoteURLField.placeholderString = "https://..."
+        remoteURLField.placeholderString = L10n.mainRemoteURLPlaceholder
         content.addSubview(remoteURLField)
 
-        addRemoteConfirmButton = NSButton(title: "添加", target: self, action: #selector(addRemoteFromPopover))
+        addRemoteConfirmButton = NSButton(title: L10n.mainAddRemoteConfirm, target: self, action: #selector(addRemoteFromPopover))
         addRemoteConfirmButton.bezelStyle = .rounded
         content.addSubview(addRemoteConfirmButton)
 
@@ -764,7 +789,7 @@ class ViewController: NSViewController {
     @objc private func addRemoteFromPopover() {
         let url = remoteURLField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !url.isEmpty else {
-            manager.setErrorMessage("请输入远程 URL")
+            manager.setErrorMessage(L10n.mainRemoteURLEmpty)
             return
         }
         addRemotePopover?.close()
@@ -794,13 +819,13 @@ class ViewController: NSViewController {
 
     @objc private func removeProfile() {
         guard case .profile(let id) = selection else { return }
-        let name = manager.profile(for: id)?.name ?? "该方案"
+        let name = manager.profile(for: id)?.name ?? L10n.mainLocalProfile
         let alert = NSAlert()
-        alert.messageText = "确定要删除「\(name)」吗？"
-        alert.informativeText = "删除后无法恢复。"
+        alert.messageText = L10n.mainDeleteProfileTitle(name)
+        alert.informativeText = L10n.mainDeleteProfileMessage
         alert.alertStyle = .warning
-        alert.addButton(withTitle: "删除")
-        alert.addButton(withTitle: "取消")
+        alert.addButton(withTitle: L10n.mainDelete)
+        alert.addButton(withTitle: L10n.tr("common.cancel"))
         if alert.runModal() == .alertFirstButtonReturn {
             performRemoveProfile()
         }
@@ -869,7 +894,7 @@ class ViewController: NSViewController {
 
     @objc private func refreshRemote() {
         guard case .profile(let id) = selection, manager.profile(for: id)?.isRemote == true else {
-            manager.setErrorMessage("请先选择远程方案")
+            manager.setErrorMessage(L10n.tr("main.remote_profile_required"))
             return
         }
         Task { [weak self] in
@@ -901,10 +926,10 @@ extension ViewController: NSTableViewDataSource, NSTableViewDelegate {
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         if row == localHeaderRow {
-            return makeSectionHeaderCell(title: "本地配置")
+            return makeSectionHeaderCell(title: L10n.mainSectionLocal)
         }
         if row == remoteHeaderRow {
-            return makeSectionHeaderCell(title: "远程配置")
+            return makeSectionHeaderCell(title: L10n.mainSectionRemote)
         }
         let cellId = NSUserInterfaceItemIdentifier("ProfileCell")
         var cell = tableView.makeView(withIdentifier: cellId, owner: self) as? ProfileCellView
@@ -916,9 +941,9 @@ extension ViewController: NSTableViewDataSource, NSTableViewDelegate {
             cell?.nameField.delegate = self
         }
         if row == systemRow {
-            cell?.configureReadOnly(title: "系统")
+            cell?.configureReadOnly(title: L10n.mainSystem)
         } else if row == baseRow {
-            cell?.configureReadOnly(title: "默认")
+            cell?.configureReadOnly(title: L10n.mainDefault)
         } else if row >= localProfileRow(0), row < localProfileRow(localProfiles.count) {
             let idx = row - 3
             cell?.configure(with: localProfiles[idx])
@@ -1048,14 +1073,14 @@ extension ViewController: ProfileTableViewContextMenuDelegate {
 
         let menu = NSMenu()
 
-        let toggleTitle = profile.isEnabled ? "停用" : "启用"
+        let toggleTitle = profile.isEnabled ? L10n.mainContextDisable : L10n.mainContextEnable
         let toggleItem = NSMenuItem(title: toggleTitle, action: #selector(toggleProfileEnabledFromContextMenu(_:)), keyEquivalent: "")
         toggleItem.target = self
         toggleItem.representedObject = id
         menu.addItem(toggleItem)
 
         if profile.isRemote {
-            let refreshItem = NSMenuItem(title: "刷新", action: #selector(refreshRemoteFromContextMenu(_:)), keyEquivalent: "")
+            let refreshItem = NSMenuItem(title: L10n.mainRefreshRemote, action: #selector(refreshRemoteFromContextMenu(_:)), keyEquivalent: "")
             refreshItem.target = self
             refreshItem.representedObject = id
             menu.addItem(refreshItem)
@@ -1063,7 +1088,7 @@ extension ViewController: ProfileTableViewContextMenuDelegate {
 
         menu.addItem(NSMenuItem.separator())
 
-        let deleteItem = NSMenuItem(title: "删除", action: #selector(removeProfileFromContextMenu(_:)), keyEquivalent: "")
+        let deleteItem = NSMenuItem(title: L10n.mainContextDelete, action: #selector(removeProfileFromContextMenu(_:)), keyEquivalent: "")
         deleteItem.target = self
         deleteItem.representedObject = id
         menu.addItem(deleteItem)
@@ -1108,5 +1133,25 @@ extension ViewController {
             make.centerY.equalToSuperview()
         }
         return cell
+    }
+
+    var debugApplyButtonTitle: String {
+        applyButton.title
+    }
+
+    var debugAddProfileButtonTitle: String {
+        addProfileButton.title
+    }
+
+    var debugSidebarTitle: String {
+        sidebarColumn.title
+    }
+
+    var debugFindPlaceholder: String {
+        findBarView.findField.placeholderString ?? ""
+    }
+
+    var debugReplacePlaceholder: String {
+        findBarView.replaceField.placeholderString ?? ""
     }
 }

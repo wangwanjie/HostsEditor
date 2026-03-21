@@ -202,7 +202,7 @@ final class UpdateManager: NSObject {
     private func checkGitHubLatestRelease(interactive: Bool) async {
         guard let latestReleaseAPIURL else {
             if interactive {
-                presentFailureAlert(message: "未配置 GitHub Releases 更新地址。")
+                presentFailureAlert(message: L10n.tr("update.unconfigured"))
             }
             return
         }
@@ -228,7 +228,7 @@ final class UpdateManager: NSObject {
             throw NSError(
                 domain: "HostsEditor.UpdateManager",
                 code: -1,
-                userInfo: [NSLocalizedDescriptionKey: "检查更新失败，GitHub 返回了异常状态。"]
+                userInfo: [NSLocalizedDescriptionKey: L10n.tr("update.github_status_error")]
             )
         }
 
@@ -242,25 +242,25 @@ final class UpdateManager: NSObject {
         guard latestVersion > currentVersion else {
             if interactive {
                 let alert = NSAlert()
-                alert.messageText = "当前已是最新版本"
-                alert.informativeText = "当前版本 \(currentAppVersion)，GitHub Releases 最新版本 \(release.tagName)。"
+                alert.messageText = L10n.tr("update.latest.title")
+                alert.informativeText = L10n.tr("update.latest.message", currentAppVersion, release.tagName)
                 alert.alertStyle = .informational
-                alert.addButton(withTitle: "确定")
+                alert.addButton(withTitle: L10n.tr("common.ok"))
                 alert.runModal()
             }
             return
         }
 
         let alert = NSAlert()
-        alert.messageText = "发现新版本 \(release.tagName)"
+        alert.messageText = L10n.tr("update.available.title", release.tagName)
         if let name = release.name, !name.isEmpty {
-            alert.informativeText = "当前版本 \(currentAppVersion)。GitHub Releases 上已有新版本“\(name)”，是否前往查看？"
+            alert.informativeText = L10n.tr("update.available.named_message", currentAppVersion, name)
         } else {
-            alert.informativeText = "当前版本 \(currentAppVersion)。GitHub Releases 上已有新版本，是否前往查看？"
+            alert.informativeText = L10n.tr("update.available.message", currentAppVersion)
         }
         alert.alertStyle = .informational
-        alert.addButton(withTitle: "前往下载")
-        alert.addButton(withTitle: "稍后")
+        alert.addButton(withTitle: L10n.tr("common.download_now"))
+        alert.addButton(withTitle: L10n.tr("common.later"))
 
         NSApp.activate(ignoringOtherApps: true)
         if alert.runModal() == .alertFirstButtonReturn,
@@ -271,10 +271,10 @@ final class UpdateManager: NSObject {
 
     private func presentFailureAlert(message: String) {
         let alert = NSAlert()
-        alert.messageText = "检查更新失败"
+        alert.messageText = L10n.tr("update.failure.title")
         alert.informativeText = message
         alert.alertStyle = .warning
-        alert.addButton(withTitle: "确定")
+        alert.addButton(withTitle: L10n.tr("common.ok"))
         NSApp.activate(ignoringOtherApps: true)
         alert.runModal()
     }

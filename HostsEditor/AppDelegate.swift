@@ -6,6 +6,7 @@
 //
 
 import Cocoa
+import Combine
 import ServiceManagement
 
 @main
@@ -17,9 +18,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private let preferencesWindowController = PreferencesWindowController.shared
     private var isPresentingHelperInterventionAlert = false
     private var shouldRetryPendingOperationAfterActivation = false
+    private var cancellables = Set<AnyCancellable>()
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         DebugRuntime.start()
+        _ = AppSettings.shared
         
         NotificationCenter.default.addObserver(
             self,
@@ -27,6 +30,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             name: .hostsEditorHelperInterventionRequired,
             object: nil
         )
+        bindLocalization()
         buildMainMenu()
         setupStatusBar()
         UpdateManager.shared.configure()
@@ -41,87 +45,87 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let main = NSMenu()
 
         let appMenu = NSMenu()
-        appMenu.addItem(NSMenuItem(title: "关于 HostsEditor", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: ""))
-        let checkForUpdatesItem = NSMenuItem(title: "检查更新…", action: #selector(checkForUpdates), keyEquivalent: "")
+        appMenu.addItem(NSMenuItem(title: L10n.tr("menu.about"), action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: ""))
+        let checkForUpdatesItem = NSMenuItem(title: L10n.tr("menu.check_updates"), action: #selector(checkForUpdates), keyEquivalent: "")
         checkForUpdatesItem.target = self
         appMenu.addItem(checkForUpdatesItem)
         appMenu.addItem(NSMenuItem.separator())
-        let preferencesItem = NSMenuItem(title: "偏好设置…", action: #selector(openPreferencesWindow), keyEquivalent: ",")
+        let preferencesItem = NSMenuItem(title: L10n.menuPreferences, action: #selector(openPreferencesWindow), keyEquivalent: ",")
         preferencesItem.target = self
         appMenu.addItem(preferencesItem)
         appMenu.addItem(NSMenuItem.separator())
-        let servicesItem = NSMenuItem(title: "服务", action: nil, keyEquivalent: "")
+        let servicesItem = NSMenuItem(title: L10n.tr("menu.services"), action: nil, keyEquivalent: "")
         let servicesMenu = NSMenu()
         servicesItem.submenu = servicesMenu
         NSApp.servicesMenu = servicesMenu
         appMenu.addItem(servicesItem)
         appMenu.addItem(NSMenuItem.separator())
-        appMenu.addItem(NSMenuItem(title: "隐藏 HostsEditor", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h"))
-        appMenu.addItem(NSMenuItem(title: "隐藏其他", action: #selector(NSApplication.hideOtherApplications(_:)), keyEquivalent: "h"))
-        appMenu.addItem(NSMenuItem(title: "显示全部", action: #selector(NSApplication.unhideAllApplications(_:)), keyEquivalent: ""))
+        appMenu.addItem(NSMenuItem(title: L10n.tr("menu.hide_app"), action: #selector(NSApplication.hide(_:)), keyEquivalent: "h"))
+        appMenu.addItem(NSMenuItem(title: L10n.tr("menu.hide_others"), action: #selector(NSApplication.hideOtherApplications(_:)), keyEquivalent: "h"))
+        appMenu.addItem(NSMenuItem(title: L10n.tr("menu.show_all"), action: #selector(NSApplication.unhideAllApplications(_:)), keyEquivalent: ""))
         appMenu.addItem(NSMenuItem.separator())
-        appMenu.addItem(NSMenuItem(title: "退出 HostsEditor", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        appMenu.addItem(NSMenuItem(title: L10n.tr("menu.quit_app"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
 
         let appItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
         appItem.submenu = appMenu
         main.addItem(appItem)
 
-        let fileMenu = NSMenu(title: "文件")
-        fileMenu.addItem(NSMenuItem(title: "新建", action: nil, keyEquivalent: "n"))
-        fileMenu.addItem(NSMenuItem(title: "打开…", action: nil, keyEquivalent: "o"))
+        let fileMenu = NSMenu(title: L10n.tr("menu.file"))
+        fileMenu.addItem(NSMenuItem(title: L10n.tr("menu.new"), action: nil, keyEquivalent: "n"))
+        fileMenu.addItem(NSMenuItem(title: L10n.tr("menu.open"), action: nil, keyEquivalent: "o"))
         fileMenu.addItem(NSMenuItem.separator())
-        fileMenu.addItem(NSMenuItem(title: "关闭", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w"))
-        let fileItem = NSMenuItem(title: "文件", action: nil, keyEquivalent: "")
+        fileMenu.addItem(NSMenuItem(title: L10n.tr("menu.close"), action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w"))
+        let fileItem = NSMenuItem(title: L10n.tr("menu.file"), action: nil, keyEquivalent: "")
         fileItem.submenu = fileMenu
         main.addItem(fileItem)
 
-        let editMenu = NSMenu(title: "编辑")
-        editMenu.addItem(NSMenuItem(title: "撤销", action: Selector(("undo:")), keyEquivalent: "z"))
-        editMenu.addItem(NSMenuItem(title: "重做", action: Selector(("redo:")), keyEquivalent: "Z"))
+        let editMenu = NSMenu(title: L10n.tr("menu.edit"))
+        editMenu.addItem(NSMenuItem(title: L10n.tr("menu.undo"), action: Selector(("undo:")), keyEquivalent: "z"))
+        editMenu.addItem(NSMenuItem(title: L10n.tr("menu.redo"), action: Selector(("redo:")), keyEquivalent: "Z"))
         editMenu.addItem(NSMenuItem.separator())
-        editMenu.addItem(NSMenuItem(title: "剪切", action: #selector(NSText.cut(_:)), keyEquivalent: "x"))
-        editMenu.addItem(NSMenuItem(title: "复制", action: #selector(NSText.copy(_:)), keyEquivalent: "c"))
-        editMenu.addItem(NSMenuItem(title: "粘贴", action: #selector(NSText.paste(_:)), keyEquivalent: "v"))
-        editMenu.addItem(NSMenuItem(title: "删除", action: #selector(NSText.delete(_:)), keyEquivalent: ""))
+        editMenu.addItem(NSMenuItem(title: L10n.tr("menu.cut"), action: #selector(NSText.cut(_:)), keyEquivalent: "x"))
+        editMenu.addItem(NSMenuItem(title: L10n.tr("menu.copy"), action: #selector(NSText.copy(_:)), keyEquivalent: "c"))
+        editMenu.addItem(NSMenuItem(title: L10n.tr("menu.paste"), action: #selector(NSText.paste(_:)), keyEquivalent: "v"))
+        editMenu.addItem(NSMenuItem(title: L10n.tr("menu.delete"), action: #selector(NSText.delete(_:)), keyEquivalent: ""))
         editMenu.addItem(NSMenuItem.separator())
-        editMenu.addItem(NSMenuItem(title: "全选", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a"))
+        editMenu.addItem(NSMenuItem(title: L10n.tr("menu.select_all"), action: #selector(NSText.selectAll(_:)), keyEquivalent: "a"))
         editMenu.addItem(NSMenuItem.separator())
-        editMenu.addItem(NSMenuItem(title: "查找", action: #selector(ViewController.showFindBar(_:)), keyEquivalent: "f"))
-        editMenu.addItem(NSMenuItem(title: "替换", action: #selector(ViewController.showReplaceBar(_:)), keyEquivalent: "r"))
-        let toggleCommentItem = NSMenuItem(title: "切换注释", action: #selector(ViewController.toggleCommentSelection(_:)), keyEquivalent: "/")
+        editMenu.addItem(NSMenuItem(title: L10n.tr("menu.find"), action: #selector(ViewController.showFindBar(_:)), keyEquivalent: "f"))
+        editMenu.addItem(NSMenuItem(title: L10n.tr("menu.replace"), action: #selector(ViewController.showReplaceBar(_:)), keyEquivalent: "r"))
+        let toggleCommentItem = NSMenuItem(title: L10n.tr("menu.toggle_comment"), action: #selector(ViewController.toggleCommentSelection(_:)), keyEquivalent: "/")
         toggleCommentItem.keyEquivalentModifierMask = [.command]
         editMenu.addItem(toggleCommentItem)
         editMenu.addItem(NSMenuItem.separator())
-        let enlargeTextItem = NSMenuItem(title: "增大字体", action: #selector(ViewController.makeTextLarger(_:)), keyEquivalent: "+")
+        let enlargeTextItem = NSMenuItem(title: L10n.tr("menu.increase_font"), action: #selector(ViewController.makeTextLarger(_:)), keyEquivalent: "+")
         enlargeTextItem.keyEquivalentModifierMask = [.command]
         editMenu.addItem(enlargeTextItem)
-        let shrinkTextItem = NSMenuItem(title: "减小字体", action: #selector(ViewController.makeTextSmaller(_:)), keyEquivalent: "-")
+        let shrinkTextItem = NSMenuItem(title: L10n.tr("menu.decrease_font"), action: #selector(ViewController.makeTextSmaller(_:)), keyEquivalent: "-")
         shrinkTextItem.keyEquivalentModifierMask = [.command]
         editMenu.addItem(shrinkTextItem)
-        let editItem = NSMenuItem(title: "编辑", action: nil, keyEquivalent: "")
+        let editItem = NSMenuItem(title: L10n.tr("menu.edit"), action: nil, keyEquivalent: "")
         editItem.submenu = editMenu
         main.addItem(editItem)
 
-        let windowMenu = NSMenu(title: "窗口")
-        windowMenu.addItem(NSMenuItem(title: "最小化", action: #selector(NSWindow.miniaturize(_:)), keyEquivalent: "m"))
-        windowMenu.addItem(NSMenuItem(title: "缩放", action: #selector(NSWindow.zoom(_:)), keyEquivalent: ""))
+        let windowMenu = NSMenu(title: L10n.tr("menu.window"))
+        windowMenu.addItem(NSMenuItem(title: L10n.tr("menu.minimize"), action: #selector(NSWindow.miniaturize(_:)), keyEquivalent: "m"))
+        windowMenu.addItem(NSMenuItem(title: L10n.tr("menu.zoom"), action: #selector(NSWindow.zoom(_:)), keyEquivalent: ""))
         NSApp.windowsMenu = windowMenu
-        let windowItem = NSMenuItem(title: "窗口", action: nil, keyEquivalent: "")
+        let windowItem = NSMenuItem(title: L10n.tr("menu.window"), action: nil, keyEquivalent: "")
         windowItem.submenu = windowMenu
         main.addItem(windowItem)
 
-        let helpMenu = NSMenu(title: "帮助")
-        let helpItem = NSMenuItem(title: "HostsEditor 帮助", action: #selector(openGitHubHomepage), keyEquivalent: "?")
+        let helpMenu = NSMenu(title: L10n.tr("menu.help"))
+        let helpItem = NSMenuItem(title: L10n.tr("menu.help_hosts_editor"), action: #selector(openGitHubHomepage), keyEquivalent: "?")
         helpItem.target = self
         helpMenu.addItem(helpItem)
         helpMenu.addItem(NSMenuItem.separator())
-        let installHelperItem = NSMenuItem(title: "启用或修复后台帮助程序", action: #selector(installHelperFromMenu), keyEquivalent: "")
+        let installHelperItem = NSMenuItem(title: L10n.preferencesRepairHelper, action: #selector(installHelperFromMenu), keyEquivalent: "")
         installHelperItem.target = self
         helpMenu.addItem(installHelperItem)
-        let uninstallHelperItem = NSMenuItem(title: "停用后台帮助程序", action: #selector(uninstallHelperFromMenu), keyEquivalent: "")
+        let uninstallHelperItem = NSMenuItem(title: L10n.preferencesDisableHelper, action: #selector(uninstallHelperFromMenu), keyEquivalent: "")
         uninstallHelperItem.target = self
         helpMenu.addItem(uninstallHelperItem)
-        let helpMenuItem = NSMenuItem(title: "帮助", action: nil, keyEquivalent: "")
+        let helpMenuItem = NSMenuItem(title: L10n.tr("menu.help"), action: nil, keyEquivalent: "")
         helpMenuItem.submenu = helpMenu
         main.addItem(helpMenuItem)
 
@@ -189,15 +193,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
 
         let alert = NSAlert()
-        alert.messageText = operation == nil ? "需要启用后台帮助程序" : "需要启用后台帮助程序"
+        alert.messageText = L10n.tr("helper.alert.install.title")
         if let operation {
-            alert.informativeText = "要\(operation)，需要先启用 HostsEditor 的后台帮助程序。首次启用后，macOS 可能要求你在“系统设置 -> 通用 -> 登录项与扩展程序”里允许它运行。"
+            alert.informativeText = L10n.tr("helper.alert.install.operation_message", operation)
         } else {
-            alert.informativeText = "HostsEditor 需要启用后台帮助程序才能写入 /etc/hosts。首次启用后，macOS 可能要求你在“系统设置 -> 通用 -> 登录项与扩展程序”里允许它运行。"
+            alert.informativeText = L10n.tr("helper.alert.install.message")
         }
         alert.alertStyle = .informational
-        alert.addButton(withTitle: "立即启用")
-        alert.addButton(withTitle: "稍后")
+        alert.addButton(withTitle: L10n.tr("common.enable_now"))
+        alert.addButton(withTitle: L10n.tr("common.later"))
         if alert.runModal() == .alertFirstButtonReturn {
             performHelperSetup(
                 forceRepair: false,
@@ -211,15 +215,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
 
         let alert = NSAlert()
-        alert.messageText = "需要允许后台帮助程序"
+        alert.messageText = L10n.tr("helper.alert.approval.title")
         if let operation {
-            alert.informativeText = "要\(operation)，请前往“系统设置 -> 通用 -> 登录项与扩展程序”允许 HostsEditor 的后台帮助程序。开启后返回应用即可继续，无需再次授权。"
+            alert.informativeText = L10n.tr("helper.alert.approval.operation_message", operation)
         } else {
-            alert.informativeText = "请前往“系统设置 -> 通用 -> 登录项与扩展程序”允许 HostsEditor 的后台帮助程序。开启后返回应用即可继续写入或读取 hosts，无需再次授权。"
+            alert.informativeText = L10n.tr("helper.alert.approval.message")
         }
         alert.alertStyle = .informational
-        alert.addButton(withTitle: "打开系统设置")
-        alert.addButton(withTitle: "稍后")
+        alert.addButton(withTitle: L10n.tr("common.open_system_settings"))
+        alert.addButton(withTitle: L10n.tr("common.later"))
         if alert.runModal() == .alertFirstButtonReturn {
             shouldRetryPendingOperationAfterActivation = operation != nil
             SMAppService.openSystemSettingsLoginItems()
@@ -231,21 +235,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if let privilegedError = err as? PrivilegedHostsError {
             switch privilegedError {
             case .registrationFailed(let message):
-                alert.messageText = "启用后台帮助程序失败"
+                alert.messageText = L10n.tr("helper.alert.enable_failed.title")
                 alert.informativeText = message
             case .repairRequired(let message):
-                alert.messageText = "后台帮助程序需要修复"
+                alert.messageText = L10n.tr("helper.alert.repair_required.title")
                 alert.informativeText = message
             default:
-                alert.messageText = "启用后台帮助程序失败"
+                alert.messageText = L10n.tr("helper.alert.enable_failed.title")
                 alert.informativeText = err.localizedDescription
             }
         } else {
-            alert.messageText = "启用后台帮助程序失败"
+            alert.messageText = L10n.tr("helper.alert.enable_failed.title")
             alert.informativeText = err.localizedDescription
         }
         alert.alertStyle = .warning
-        alert.addButton(withTitle: "确定")
+        alert.addButton(withTitle: L10n.tr("common.ok"))
         alert.runModal()
     }
 
@@ -264,10 +268,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
                 guard announceSuccess else { return }
                 let alert = NSAlert()
-                alert.messageText = "后台帮助程序已就绪"
-                alert.informativeText = "现在可以继续写入系统 hosts 文件。后续只要该后台帮助程序保持允许状态，就不需要再次授权。"
+                alert.messageText = L10n.tr("helper.alert.ready.title")
+                alert.informativeText = L10n.tr("helper.alert.ready.message")
                 alert.alertStyle = .informational
-                alert.addButton(withTitle: "确定")
+                alert.addButton(withTitle: L10n.tr("common.ok"))
                 alert.runModal()
             } catch let privilegedError as PrivilegedHostsError {
                 switch privilegedError {
@@ -288,28 +292,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func uninstallHelperFromMenu() {
         let alert = NSAlert()
-        alert.messageText = "停用后台帮助程序"
-        alert.informativeText = "停用后将无法直接写入系统 hosts，直到重新启用。"
+        alert.messageText = L10n.tr("helper.alert.disable.title")
+        alert.informativeText = L10n.tr("helper.alert.disable.message")
         alert.alertStyle = .warning
-        alert.addButton(withTitle: "停用")
-        alert.addButton(withTitle: "取消")
+        alert.addButton(withTitle: L10n.tr("common.disable"))
+        alert.addButton(withTitle: L10n.tr("common.cancel"))
         guard alert.runModal() == .alertFirstButtonReturn else { return }
 
         Task { @MainActor in
             do {
                 try await HostsManager.shared.uninstallHelperAndWait()
                 let success = NSAlert()
-                success.messageText = "后台帮助程序已停用"
-                success.informativeText = "如需继续编辑系统 hosts，可在“帮助”菜单中重新启用。"
+                success.messageText = L10n.tr("helper.alert.disabled_done.title")
+                success.informativeText = L10n.tr("helper.alert.disabled_done.message")
                 success.alertStyle = .informational
-                success.addButton(withTitle: "确定")
+                success.addButton(withTitle: L10n.tr("common.ok"))
                 success.runModal()
             } catch {
                 let failure = NSAlert()
-                failure.messageText = "停用后台帮助程序失败"
+                failure.messageText = L10n.tr("helper.alert.disable_failed.title")
                 failure.informativeText = error.localizedDescription
                 failure.alertStyle = .warning
-                failure.addButton(withTitle: "确定")
+                failure.addButton(withTitle: L10n.tr("common.ok"))
                 failure.runModal()
             }
         }
@@ -330,11 +334,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         case .install:
             if HostsManager.shared.isHelperExplicitlyDisabled {
                 let alert = NSAlert()
-                alert.messageText = "后台帮助程序已停用"
-                alert.informativeText = "要\(operation)，请先在“帮助”菜单中重新启用后台帮助程序。"
+                alert.messageText = L10n.tr("helper.alert.disabled.title")
+                alert.informativeText = L10n.tr("helper.alert.disabled.operation_message", operation)
                 alert.alertStyle = .informational
-                alert.addButton(withTitle: "重新启用")
-                alert.addButton(withTitle: "取消")
+                alert.addButton(withTitle: L10n.tr("common.enable_now"))
+                alert.addButton(withTitle: L10n.tr("common.cancel"))
                 if alert.runModal() == .alertFirstButtonReturn {
                     performHelperSetup(forceRepair: false, announceSuccess: false, retryPendingOperation: true)
                 }
@@ -345,11 +349,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             presentHelperApprovalAlert(operation: operation)
         case .repair:
             let alert = NSAlert()
-            alert.messageText = "需要修复后台帮助程序"
-            alert.informativeText = "要\(operation)，HostsEditor 需要重新注册后台帮助程序。全新安装并已允许后，后续读写 hosts 不应再次授权；如果你之前装过旧版本，请先清理旧登录项或后台任务记录后再修复。"
+            alert.messageText = L10n.tr("helper.alert.repair.title")
+            alert.informativeText = L10n.tr("helper.alert.repair.message", operation)
             alert.alertStyle = .warning
-            alert.addButton(withTitle: "立即修复")
-            alert.addButton(withTitle: "稍后")
+            alert.addButton(withTitle: L10n.tr("common.repair_now"))
+            alert.addButton(withTitle: L10n.tr("common.later"))
             if alert.runModal() == .alertFirstButtonReturn {
                 performHelperSetup(forceRepair: true, announceSuccess: false, retryPendingOperation: true)
             }
@@ -378,18 +382,25 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             button.image = image
             button.imageScaling = .scaleProportionallyDown
         }
+        rebuildStatusMenu()
+    }
+
+    private func rebuildStatusMenu() {
         statusMenu = NSMenu()
-        statusMenu?.addItem(NSMenuItem(title: "打开 HostsEditor", action: #selector(openMainWindow), keyEquivalent: ""))
+        profileMenuItems.removeAll()
+        statusMenu?.addItem(NSMenuItem(title: L10n.tr("status.open_main_window"), action: #selector(openMainWindow), keyEquivalent: ""))
         statusMenu?.addItem(NSMenuItem.separator())
         rebuildProfileMenuItems()
         statusMenu?.addItem(NSMenuItem.separator())
-        statusMenu?.addItem(NSMenuItem(title: "退出", action: #selector(quit), keyEquivalent: "q"))
+        statusMenu?.addItem(NSMenuItem(title: L10n.tr("status.quit"), action: #selector(quit), keyEquivalent: "q"))
         statusMenu?.delegate = self
         statusItem?.menu = statusMenu
     }
 
     private func rebuildProfileMenuItems() {
-        profileMenuItems.forEach { statusMenu?.removeItem($0) }
+        for item in profileMenuItems where item.menu === statusMenu {
+            statusMenu?.removeItem(item)
+        }
         profileMenuItems = []
         var insertIndex = 2
         for profile in HostsManager.shared.profiles {
@@ -425,6 +436,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func quit() {
         NSApp.terminate(nil)
+    }
+
+    private func bindLocalization() {
+        guard cancellables.isEmpty else { return }
+        AppLocalization.shared.$language
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.buildMainMenu()
+                self?.rebuildStatusMenu()
+            }
+            .store(in: &cancellables)
     }
 }
 
