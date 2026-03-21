@@ -14,6 +14,7 @@ SCHEME="HostsEditor"
 CONFIGURATION="Release"
 BUILD_DIR="$PROJECT_DIR/build"
 DERIVED_DATA="$BUILD_DIR/DerivedData"
+ARCHIVE_PATH="$BUILD_DIR/HostsEditor.xcarchive"
 DMG_OUTPUT_DIR="$BUILD_DIR/dmg"
 KEYCHAIN_PROFILE="vanjay_mac_stapler"
 DO_NOTARIZE=true
@@ -24,161 +25,118 @@ generate_dmg_background() {
     local output_path="$1"
 
     /usr/bin/swift - "$output_path" <<'SWIFT'
-import AppKit
+import Cocoa
 import Foundation
 
+// 获取输出路径
 guard CommandLine.arguments.count >= 2 else {
-    fputs("missing output path\n", stderr)
+    fputs("Error: Missing output path\n", stderr)
     exit(1)
 }
-
 let outputPath = CommandLine.arguments[1]
-let size = NSSize(width: 620, height: 360)
-let rect = NSRect(origin: .zero, size: size)
-let backgroundColor = NSColor(calibratedRed: 0.96, green: 0.97, blue: 0.99, alpha: 1)
-let headerTopColor = NSColor(calibratedRed: 0.87, green: 0.93, blue: 0.99, alpha: 1)
-let headerMidColor = NSColor(calibratedRed: 0.91, green: 0.95, blue: 0.99, alpha: 1)
-let panelStrokeColor = NSColor(calibratedRed: 0.80, green: 0.85, blue: 0.92, alpha: 0.9)
-let accentColor = NSColor(calibratedRed: 0.24, green: 0.53, blue: 0.92, alpha: 1)
-let badgeFillColor = NSColor(calibratedRed: 0.90, green: 0.95, blue: 1.0, alpha: 1)
-let headerBottomY: CGFloat = 220
-let leftPanel = NSRect(x: 58, y: 72, width: 192, height: 168)
-let rightPanel = NSRect(x: 370, y: 72, width: 192, height: 168)
-let badgeSize: CGFloat = 54
-let badgeMidOffset: CGFloat = 53
-let badge1Rect = NSRect(
-    x: (leftPanel.maxX + rightPanel.minX) / 2 - badgeMidOffset - badgeSize / 2,
-    y: leftPanel.midY - badgeSize / 2,
-    width: badgeSize,
-    height: badgeSize
-)
-let badge2Rect = NSRect(
-    x: (leftPanel.maxX + rightPanel.minX) / 2 + badgeMidOffset - badgeSize / 2,
-    y: rightPanel.midY - badgeSize / 2,
-    width: badgeSize,
-    height: badgeSize
-)
-let connectorY = leftPanel.midY
 
-let image = NSImage(size: size)
-image.lockFocus()
+// MARK: - BackgroundView Definition
+class BackgroundView: NSView {
+    private enum Constants {
+        static let imageWidth: CGFloat = 620
+        static let imageHeight: CGFloat = 360
+        static let backgroundColor = NSColor(srgbRed: 0.95, green: 0.97, blue: 0.98, alpha: 1)
+        static let topGradientColor = NSColor(srgbRed: 0.80, green: 0.90, blue: 0.95, alpha: 1)
+        static let accentColor = NSColor(calibratedRed: 0.11, green: 0.43, blue: 0.63, alpha: 1)
+        static let textColor = NSColor(srgbRed: 0.10, green: 0.17, blue: 0.24, alpha: 1)
+        static let subtitleColor = NSColor(srgbRed: 0.28, green: 0.35, blue: 0.42, alpha: 1)
+        static let panelFillColor = NSColor(srgbRed: 1, green: 1, blue: 1, alpha: 0.94)
+        static let panelStrokeColor = NSColor(srgbRed: 0.73, green: 0.83, blue: 0.90, alpha: 1)
+        static let cornerRadius: CGFloat = 24
+        static let panelCornerRadius: CGFloat = 26
+        static let panelStrokeWidth: CGFloat = 2
+        static let titleFont = NSFont(name: "Avenir Next Demi Bold", size: 26) ?? .systemFont(ofSize: 26, weight: .semibold)
+        static let subtitleFont = NSFont(name: "Avenir Next Regular", size: 14) ?? .systemFont(ofSize: 14)
+        static let titleText = "Drag HostsEditor to Applications"
+        static let subtitleText = "Install the native macOS inspector by dragging it onto the Applications shortcut"
+    }
 
-let outer = NSBezierPath(roundedRect: rect, xRadius: 24, yRadius: 24)
-backgroundColor.setFill()
-outer.fill()
+    override func draw(_ dirtyRect: NSRect) {
+        // 背景
+        let path = NSBezierPath(roundedRect: bounds, xRadius: Constants.cornerRadius, yRadius: Constants.cornerRadius)
+        Constants.backgroundColor.setFill()
+        path.fill()
 
-NSGraphicsContext.saveGraphicsState()
-outer.addClip()
-let headerRect = NSRect(x: 0, y: headerBottomY, width: size.width, height: size.height - headerBottomY)
-let headerGradient = NSGradient(colorsAndLocations:
-    (headerTopColor, 0.0),
-    (headerMidColor, 0.55),
-    (backgroundColor, 1.0)
-)
-headerGradient?.draw(in: headerRect, angle: -90)
-NSGraphicsContext.restoreGraphicsState()
+        // 渐变头 (y=0 在底部)
+        let headerRect = NSRect(x: 0, y: 250, width: bounds.width, height: 110)
+        let gradient = NSGradient(starting: Constants.topGradientColor, ending: Constants.backgroundColor)!
+        gradient.draw(in: headerRect, angle: -90)
 
-func drawText(_ text: String, rect: NSRect, font: NSFont, color: NSColor, alignment: NSTextAlignment = .center) {
-    let paragraph = NSMutableParagraphStyle()
-    paragraph.alignment = alignment
-    let attributes: [NSAttributedString.Key: Any] = [
-        .font: font,
-        .foregroundColor: color,
-        .paragraphStyle: paragraph
-    ]
-    let attributedText = NSAttributedString(string: text, attributes: attributes)
-    let options: NSString.DrawingOptions = [.usesLineFragmentOrigin, .usesFontLeading]
-    var textBounds = attributedText.boundingRect(
-        with: NSSize(width: rect.width, height: .greatestFiniteMagnitude),
-        options: options
-    )
-    textBounds.size.width = ceil(textBounds.width)
-    textBounds.size.height = ceil(textBounds.height)
+        // 文字
+        drawText(Constants.titleText, font: Constants.titleFont, color: Constants.textColor, in: NSRect(x: 60, y: 286, width: 500, height: 34))
+        drawText(Constants.subtitleText, font: Constants.subtitleFont, color: Constants.subtitleColor, in: NSRect(x: 70, y: 242, width: 480, height: 24))
 
-    let drawRect = NSRect(
-        x: rect.minX,
-        y: rect.minY + (rect.height - textBounds.height) / 2,
-        width: rect.width,
-        height: textBounds.height
-    )
-    attributedText.draw(with: drawRect, options: options)
+        // 面板
+        drawPanel(NSRect(x: 58, y: 72, width: 192, height: 168))
+        drawPanel(NSRect(x: 370, y: 72, width: 192, height: 168))
+
+        // 箭头
+        let arrowBody = NSBezierPath()
+        arrowBody.move(to: NSPoint(x: 254, y: 156))
+        arrowBody.line(to: NSPoint(x: 338, y: 156))
+        Constants.accentColor.setStroke()
+        arrowBody.lineWidth = 14
+        arrowBody.stroke()
+
+        let arrowHead = NSBezierPath()
+        arrowHead.move(to: NSPoint(x: 326, y: 178))
+        arrowHead.line(to: NSPoint(x: 364, y: 156))
+        arrowHead.line(to: NSPoint(x: 326, y: 134))
+        arrowHead.close()
+        Constants.accentColor.setFill()
+        arrowHead.fill()
+    }
+
+    private func drawPanel(_ rect: NSRect) {
+        let path = NSBezierPath(roundedRect: rect, xRadius: Constants.panelCornerRadius, yRadius: Constants.panelCornerRadius)
+        Constants.panelFillColor.setFill()
+        path.fill()
+        Constants.panelStrokeColor.setStroke()
+        path.lineWidth = Constants.panelStrokeWidth
+        path.stroke()
+    }
+
+    private func drawText(_ text: String, font: NSFont, color: NSColor, in rect: NSRect) {
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.alignment = .center
+        let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: color, .paragraphStyle: paragraph]
+        (text as NSString).draw(in: rect, withAttributes: attributes)
+    }
 }
 
-func drawPanel(_ rect: NSRect) {
-    let panel = NSBezierPath(roundedRect: rect, xRadius: 26, yRadius: 26)
-    NSColor(calibratedWhite: 1.0, alpha: 0.9).setFill()
-    panel.fill()
+// MARK: - Execution
+let width = 620
+let height = 360
+let frame = NSRect(x: 0, y: 0, width: width, height: height)
+let view = BackgroundView(frame: frame)
 
-    panelStrokeColor.setStroke()
-    panel.lineWidth = 2
-    panel.stroke()
-}
-
-drawPanel(leftPanel)
-drawPanel(rightPanel)
-
-let arrowPath = NSBezierPath()
-arrowPath.move(to: NSPoint(x: 272, y: connectorY))
-arrowPath.line(to: NSPoint(x: 356, y: connectorY))
-arrowPath.lineWidth = 14
-arrowPath.lineCapStyle = .round
-accentColor.setStroke()
-arrowPath.stroke()
-
-let head = NSBezierPath()
-head.move(to: NSPoint(x: 354, y: connectorY + 22))
-head.line(to: NSPoint(x: 392, y: connectorY))
-head.line(to: NSPoint(x: 354, y: connectorY - 22))
-head.close()
-accentColor.setFill()
-head.fill()
-
-drawText(
-    "Drag HostsEditor to Applications",
-    rect: NSRect(x: 60, y: 282, width: 500, height: 42),
-    font: NSFont(name: "Avenir Next Demi Bold", size: 26) ?? .systemFont(ofSize: 26, weight: .semibold),
-    color: NSColor(calibratedRed: 0.09, green: 0.18, blue: 0.30, alpha: 1)
-)
-
-drawText(
-    "Install by dragging the app onto the Applications shortcut",
-    rect: NSRect(x: 70, y: 246, width: 480, height: 30),
-    font: NSFont(name: "Avenir Next Regular", size: 14) ?? .systemFont(ofSize: 14, weight: .regular),
-    color: NSColor(calibratedRed: 0.26, green: 0.34, blue: 0.45, alpha: 1)
-)
-
-let badge = NSBezierPath(roundedRect: badge1Rect, xRadius: 27, yRadius: 27)
-badgeFillColor.setFill()
-badge.fill()
-
-drawText(
-    "1",
-    rect: badge1Rect.offsetBy(dx: 0, dy: 1),
-    font: .systemFont(ofSize: 22, weight: .bold),
-    color: accentColor
-)
-
-let badge2 = NSBezierPath(roundedRect: badge2Rect, xRadius: 27, yRadius: 27)
-badgeFillColor.setFill()
-badge2.fill()
-
-drawText(
-    "2",
-    rect: badge2Rect.offsetBy(dx: 0, dy: 1),
-    font: .systemFont(ofSize: 22, weight: .bold),
-    color: accentColor
-)
-
-image.unlockFocus()
-
-guard let tiff = image.tiffRepresentation,
-      let bitmap = NSBitmapImageRep(data: tiff),
-      let png = bitmap.representation(using: .png, properties: [:]) else {
-    fputs("failed to render png\n", stderr)
+// 关键步骤：将 View 内容捕获为 Bitmap
+guard let bitmapRep = view.bitmapImageRepForCachingDisplay(in: frame) else {
+    fputs("Error: Could not create bitmap rep\n", stderr)
     exit(1)
 }
 
-try png.write(to: URL(fileURLWithPath: outputPath), options: .atomic)
+// 强制进行绘制到 bitmap
+view.cacheDisplay(in: frame, to: bitmapRep)
+
+// 转换为 PNG 数据
+guard let pngData = bitmapRep.representation(using: .png, properties: [:]) else {
+    fputs("Error: Could not generate PNG data\n", stderr)
+    exit(1)
+}
+
+// 写入文件
+do {
+    try pngData.write(to: URL(fileURLWithPath: outputPath))
+} catch {
+    fputs("Error: \(error.localizedDescription)\n", stderr)
+    exit(1)
+}
 SWIFT
 }
 
@@ -367,17 +325,19 @@ fi
 echo "版本号: $VERSION"
 
 DMG_NAME="HostsEditor_V_${VERSION}.dmg"
-APP_PATH="$DERIVED_DATA/Build/Products/$CONFIGURATION/HostsEditor.app"
+APP_PATH="$ARCHIVE_PATH/Products/Applications/HostsEditor.app"
 
-# 构建（arm64 + x86_64，Release 需使用 Developer ID Application 签名）
-echo "构建 $SCHEME (Release, arm64 + x86_64)..."
+# 使用 archive，避免 scheme 的 BuildAction 在多 target 场景下误构建 Debug runnable target。
+# 归档（arm64 + x86_64，Release 需使用 Developer ID Application 签名）
+echo "归档 $SCHEME (Release, arm64 + x86_64)..."
 xcodebuild -scheme "$SCHEME" \
     -configuration "$CONFIGURATION" \
     -derivedDataPath "$DERIVED_DATA" \
+    -archivePath "$ARCHIVE_PATH" \
     -destination "generic/platform=macOS" \
     ARCHS="arm64 x86_64" \
     ONLY_ACTIVE_ARCH=NO \
-    clean build
+    clean archive
 
 if [[ ! -d "$APP_PATH" ]]; then
     echo "错误: 未找到构建产物 $APP_PATH" >&2
