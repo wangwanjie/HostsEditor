@@ -8,22 +8,8 @@
       buildArchitectures = "Automatic">
       <BuildActionEntries>
          <BuildActionEntry
-            buildForTesting = "NO"
-            buildForRunning = "YES"
-            buildForProfiling = "NO"
-            buildForArchiving = "NO"
-            buildForAnalyzing = "YES">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "A8F1000C2F70000100A34B51"
-               BuildableName = "HostsEditorDebug.app"
-               BlueprintName = "HostsEditorDebug"
-               ReferencedContainer = "container:HostsEditor.xcodeproj">
-            </BuildableReference>
-         </BuildActionEntry>
-         <BuildActionEntry
             buildForTesting = "YES"
-            buildForRunning = "NO"
+            buildForRunning = "YES"
             buildForProfiling = "YES"
             buildForArchiving = "YES"
             buildForAnalyzing = "YES">
@@ -82,9 +68,9 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "A8F1000C2F70000100A34B51"
-            BuildableName = "HostsEditorDebug.app"
-            BlueprintName = "HostsEditorDebug"
+            BlueprintIdentifier = "955DC7AB2F5E5B9700A34B51"
+            BuildableName = "HostsEditor.app"
+            BlueprintName = "HostsEditor"
             ReferencedContainer = "container:HostsEditor.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
