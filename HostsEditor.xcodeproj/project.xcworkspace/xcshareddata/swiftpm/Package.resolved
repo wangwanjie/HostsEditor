@@ -1,6 +1,15 @@
 {
-  "originHash" : "6cf40633147bc1626449c9384858d2b5bff5645699872acdda269c02c6de79b8",
+  "originHash" : "5c29080ebb777d36be0a8e87c39557146ec77a14c6c85e4de42a67cf66a511d4",
   "pins" : [
+    {
+      "identity" : "grdb.swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/groue/GRDB.swift.git",
+      "state" : {
+        "revision" : "36e30a6f1ef10e4194f6af0cff90888526f0c115",
+        "version" : "7.10.0"
+      }
+    },
     {
       "identity" : "snapkit",
       "kind" : "remoteSourceControl",
@@ -17,15 +26,6 @@
       "state" : {
         "revision" : "21d8df80440b1ca3b65fa82e40782f1e5a9e6ba2",
         "version" : "2.9.0"
-      }
-    },
-    {
-      "identity" : "viewscope",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/wangwanjie/ViewScope",
-      "state" : {
-        "branch" : "main",
-        "revision" : "c7c113c3ffbc3927c83c68c21a1858a47542a30a"
       }
     }
   ],

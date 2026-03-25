@@ -15,6 +15,7 @@
 		A1B2C3D42F6A000000A34B51 /* SnapKit in Frameworks */ = {isa = PBXBuildFile; productRef = A1B2C3D62F6A000000A34B51 /* SnapKit */; };
 		C01E9FDAB4E7D97B06326737 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 01AF1926754AF7C59AE59BA3 /* Sparkle */; };
 		C4BA1B9B2018418CB91AC117 /* Pods_HostsEditorUITests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B3A1D3F8182567E638E1237F /* Pods_HostsEditorUITests.framework */; };
+		F1A2B3C42A00000100A34B51 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = F1A2B3C62A00000100A34B51 /* GRDB */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -130,6 +131,7 @@
 			files = (
 				A1B2C3D42F6A000000A34B51 /* SnapKit in Frameworks */,
 				C01E9FDAB4E7D97B06326737 /* Sparkle in Frameworks */,
+				F1A2B3C42A00000100A34B51 /* GRDB in Frameworks */,
 				65689CA981BAFEB04E5A3626 /* Pods_HostsEditor.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -246,6 +248,7 @@
 			packageProductDependencies = (
 				A1B2C3D62F6A000000A34B51 /* SnapKit */,
 				01AF1926754AF7C59AE59BA3 /* Sparkle */,
+				F1A2B3C62A00000100A34B51 /* GRDB */,
 			);
 			productName = HostsEditor;
 			productReference = 955DC7AC2F5E5B9700A34B51 /* HostsEditor.app */;
@@ -353,6 +356,7 @@
 			packageReferences = (
 				A1B2C3D52F6A000000A34B51 /* XCRemoteSwiftPackageReference "SnapKit" */,
 				DCA1CFE03F952840914E5D99 /* XCRemoteSwiftPackageReference "Sparkle" */,
+				F1A2B3C52A00000100A34B51 /* XCRemoteSwiftPackageReference "GRDB.swift" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 955DC7AD2F5E5B9700A34B51 /* Products */;
@@ -962,6 +966,14 @@
 				minimumVersion = 2.8.0;
 			};
 		};
+		F1A2B3C52A00000100A34B51 /* XCRemoteSwiftPackageReference "GRDB.swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/groue/GRDB.swift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 7.0.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -974,6 +986,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = A1B2C3D52F6A000000A34B51 /* XCRemoteSwiftPackageReference "SnapKit" */;
 			productName = SnapKit;
+		};
+		F1A2B3C62A00000100A34B51 /* GRDB */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F1A2B3C52A00000100A34B51 /* XCRemoteSwiftPackageReference "GRDB.swift" */;
+			productName = GRDB;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
