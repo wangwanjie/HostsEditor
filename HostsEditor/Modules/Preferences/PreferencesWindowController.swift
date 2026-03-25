@@ -14,7 +14,9 @@ final class PreferencesWindowController: NSWindowController {
 
     fileprivate static let autosaveName = NSWindow.FrameAutosaveName("HostsEditorPreferencesWindowFrame")
     fileprivate static let defaultContentWidth: CGFloat = 620
-    fileprivate static let minimumContentHeight: CGFloat = 220
+    fileprivate static let minimumContentHeight: CGFloat = 180
+    fileprivate static let verticalContentInsets: CGFloat = 44
+    fileprivate static let sectionSpacing: CGFloat = 18
 
     private var cancellables = Set<AnyCancellable>()
 
@@ -48,6 +50,7 @@ final class PreferencesWindowController: NSWindowController {
     func showPreferencesWindow() {
         NSApp.activate(ignoringOtherApps: true)
         showWindow(nil)
+        preferencesViewController.prepareForPresentation()
         window?.makeKeyAndOrderFront(nil)
     }
 
@@ -111,7 +114,9 @@ private final class PreferencesViewController: NSViewController {
     private let settings: AppSettings
     private var cancellables = Set<AnyCancellable>()
     private var currentSection: PreferencesSection = .general
-    private var rootStack: NSStackView!
+    private var sectionContainerView: NSView!
+    private var activeSectionView: NSView?
+    private var sectionControlWidthConstraint: NSLayoutConstraint?
 
     private let sectionControl = NSSegmentedControl(labels: ["", "", "", ""], trackingMode: .selectOne, target: nil, action: nil)
 
@@ -174,11 +179,18 @@ private final class PreferencesViewController: NSViewController {
         updateAppearanceColors()
     }
 
+    override func viewDidAppear() {
+        super.viewDidAppear()
+        prepareForPresentation()
+    }
+
     private func buildUI() {
+        view.identifier = NSUserInterfaceItemIdentifier("preferences.root")
         sectionControl.segmentStyle = .rounded
         sectionControl.selectedSegment = currentSection.rawValue
         sectionControl.target = self
         sectionControl.action = #selector(sectionChanged(_:))
+        sectionControl.identifier = NSUserInterfaceItemIdentifier("preferences.sectionControl")
 
         generalSectionView = makeSectionCard(contentViews: [
             makeLabeledRow(labelStorage: &generalLanguageLabel, title: L10n.preferencesLanguage, control: makeLanguagePopup()),
@@ -201,27 +213,30 @@ private final class PreferencesViewController: NSViewController {
             helperActionsRow(),
         ])
 
-        rootStack = NSStackView(views: [sectionControl, generalSectionView, updatesSectionView, editorSectionView, helperSectionView])
-        rootStack.orientation = .vertical
-        rootStack.alignment = .leading
-        rootStack.spacing = 18
+        sectionContainerView = NSView()
+        sectionContainerView.translatesAutoresizingMaskIntoConstraints = false
+        sectionContainerView.identifier = NSUserInterfaceItemIdentifier("preferences.sectionContainer")
+        sectionControl.setContentHuggingPriority(.required, for: .horizontal)
+        sectionControl.setContentCompressionResistancePriority(.required, for: .horizontal)
+        sectionContainerView.setContentHuggingPriority(.required, for: .vertical)
+        sectionContainerView.setContentCompressionResistancePriority(.required, for: .vertical)
 
-        view.addSubview(rootStack)
-        rootStack.snp.makeConstraints { make in
-            make.top.equalToSuperview().offset(22)
-            make.leading.trailing.equalToSuperview().inset(24)
-            make.bottom.equalToSuperview().inset(22)
-        }
-
+        view.addSubview(sectionControl)
+        view.addSubview(sectionContainerView)
         sectionControl.snp.makeConstraints { make in
-            make.width.equalTo(rootStack)
+            make.top.equalToSuperview().offset(22)
+            make.leading.equalToSuperview().offset(24)
+            make.trailing.lessThanOrEqualToSuperview().inset(24)
+        }
+        sectionControlWidthConstraint = sectionControl.widthAnchor.constraint(equalToConstant: 0)
+        sectionControlWidthConstraint?.isActive = true
+        sectionContainerView.snp.makeConstraints { make in
+            make.top.equalTo(sectionControl.snp.bottom).offset(PreferencesWindowController.sectionSpacing)
+            make.leading.trailing.equalToSuperview().inset(24)
+            make.bottom.lessThanOrEqualToSuperview().inset(22)
         }
 
-        for sectionView in [generalSectionView, updatesSectionView, editorSectionView, helperSectionView] {
-            sectionView?.snp.makeConstraints { make in
-                make.width.equalTo(rootStack)
-            }
-        }
+        installCurrentSectionViewIfNeeded(force: true)
     }
 
     private func bindSettings() {
@@ -239,6 +254,7 @@ private final class PreferencesViewController: NSViewController {
                 self?.applyLocalization()
                 self?.syncControlsFromSettings()
                 self?.syncHelperControls()
+                self?.syncVisibleSection(animated: false)
             }
             .store(in: &cancellables)
 
@@ -279,15 +295,24 @@ private final class PreferencesViewController: NSViewController {
         let font = sectionControl.font ?? .systemFont(ofSize: NSFont.systemFontSize)
         let horizontalPadding: CGFloat = 28
         let minimumSegmentWidth: CGFloat = 72
+        var totalWidth: CGFloat = 0
 
         for section in PreferencesSection.allCases {
             let title = section.title as NSString
             let textWidth = ceil(title.size(withAttributes: [.font: font]).width)
             let segmentWidth = max(minimumSegmentWidth, textWidth + horizontalPadding)
             sectionControl.setWidth(segmentWidth, forSegment: section.rawValue)
+            totalWidth += segmentWidth
         }
 
+        sectionControlWidthConstraint?.constant = ceil(totalWidth)
+        sectionControl.invalidateIntrinsicContentSize()
+        sectionControl.sizeToFit()
         sectionControl.needsLayout = true
+        sectionControl.needsDisplay = true
+        sectionControl.layoutSubtreeIfNeeded()
+        view.needsLayout = true
+        view.layoutSubtreeIfNeeded()
     }
 
     private func syncControlsFromSettings() {
@@ -349,23 +374,32 @@ private final class PreferencesViewController: NSViewController {
 
     private func syncVisibleSection(animated: Bool) {
         sectionControl.selectedSegment = currentSection.rawValue
-        generalSectionView.isHidden = currentSection != .general
-        updatesSectionView.isHidden = currentSection != .updates
-        editorSectionView.isHidden = currentSection != .editor
-        helperSectionView.isHidden = currentSection != .helper
+        installCurrentSectionViewIfNeeded(force: false)
+        sectionContainerView.needsLayout = true
+        sectionContainerView.layoutSubtreeIfNeeded()
+        view.needsLayout = true
+        view.layoutSubtreeIfNeeded()
         resizeWindowToFitCurrentSection(animated: animated)
     }
 
     private func resizeWindowToFitCurrentSection(animated: Bool) {
         guard let window = view.window else { return }
 
+        let visibleSectionView = currentSectionView()
+        window.contentView?.layoutSubtreeIfNeeded()
         view.layoutSubtreeIfNeeded()
-        rootStack.layoutSubtreeIfNeeded()
+        sectionContainerView.layoutSubtreeIfNeeded()
+        visibleSectionView.layoutSubtreeIfNeeded()
 
         let contentWidth = max(PreferencesWindowController.defaultContentWidth, window.contentLayoutRect.width)
         let contentHeight = max(
             PreferencesWindowController.minimumContentHeight,
-            ceil(rootStack.fittingSize.height + 44)
+            ceil(
+                sectionControl.fittingSize.height
+                    + visibleSectionView.fittingSize.height
+                    + PreferencesWindowController.sectionSpacing
+                    + PreferencesWindowController.verticalContentInsets
+            )
         )
         let targetFrameSize = window.frameRect(
             forContentRect: NSRect(origin: .zero, size: NSSize(width: contentWidth, height: contentHeight))
@@ -379,7 +413,33 @@ private final class PreferencesViewController: NSViewController {
         frame.origin.y -= deltaHeight
         frame.size.height += deltaHeight
         frame.size.width += deltaWidth
-        window.setFrame(frame, display: true, animate: animated)
+        guard animated, window.isVisible else {
+            window.setFrame(frame, display: true)
+            return
+        }
+
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.2
+            context.allowsImplicitAnimation = false
+            window.animator().setFrame(frame, display: true)
+        }
+    }
+
+    private func installCurrentSectionViewIfNeeded(force: Bool) {
+        let desiredSectionView = currentSectionView()
+        guard force || activeSectionView !== desiredSectionView else { return }
+
+        activeSectionView?.removeFromSuperview()
+        sectionContainerView.addSubview(desiredSectionView)
+        desiredSectionView.setContentHuggingPriority(.required, for: .vertical)
+        desiredSectionView.setContentCompressionResistancePriority(.required, for: .vertical)
+        desiredSectionView.snp.remakeConstraints { make in
+            make.top.leading.trailing.equalToSuperview()
+            make.bottom.equalToSuperview()
+        }
+        activeSectionView = desiredSectionView
+        sectionContainerView.needsLayout = true
+        sectionContainerView.layoutSubtreeIfNeeded()
     }
 
     private func updateAppearanceColors() {
@@ -404,7 +464,8 @@ private final class PreferencesViewController: NSViewController {
 
         card.addSubview(contentStack)
         contentStack.snp.makeConstraints { make in
-            make.edges.equalToSuperview().inset(18)
+            make.top.leading.trailing.equalToSuperview().inset(18)
+            make.bottom.lessThanOrEqualToSuperview().inset(18)
         }
 
         return card
@@ -722,6 +783,26 @@ private final class PreferencesViewController: NSViewController {
         guard let section = PreferencesSection(rawValue: index) else { return }
         currentSection = section
         syncVisibleSection(animated: true)
+    }
+
+    func prepareForPresentation() {
+        guard isViewLoaded else { return }
+        view.layoutSubtreeIfNeeded()
+        updateSectionControlWidths()
+        syncVisibleSection(animated: false)
+    }
+
+    private func currentSectionView() -> NSView {
+        switch currentSection {
+        case .general:
+            generalSectionView
+        case .updates:
+            updatesSectionView
+        case .editor:
+            editorSectionView
+        case .helper:
+            helperSectionView
+        }
     }
 }
 
