@@ -7,28 +7,25 @@ import Testing
 struct AppSettingsLocalizationTests {
     @MainActor
     @Test
-    func appSettingsPersistsLanguageAndAppearanceAndAppliesThem() {
-        let suiteName = "HostsEditorTests.AppSettingsLocalizationTests"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defaults.removePersistentDomain(forName: suiteName)
+    func appSettingsPersistsLanguageAndAppearanceAndAppliesThem() throws {
+        let database = try AppDatabase.inMemory()
 
         let application = NSApplication.shared
         let originalAppearance = application.appearance
         let originalLanguage = AppLocalization.shared.language
 
         defer {
-            defaults.removePersistentDomain(forName: suiteName)
             application.appearance = originalAppearance
             AppLocalization.shared.setLanguage(originalLanguage)
         }
 
-        let settings = AppSettings(defaults: defaults)
+        let settings = AppSettings(database: database)
 
         settings.appLanguage = .english
         settings.appAppearance = .dark
 
-        #expect(defaults.string(forKey: "HostsEditorAppLanguage") == AppLanguage.english.rawValue)
-        #expect(defaults.string(forKey: "HostsEditorAppAppearance") == AppAppearance.dark.rawValue)
+        #expect(try database.settingValue(.appLanguage) == .string(AppLanguage.english.rawValue))
+        #expect(try database.settingValue(.appAppearance) == .string(AppAppearance.dark.rawValue))
         #expect(AppLocalization.shared.language == .english)
         #expect(application.appearance?.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua)
     }

@@ -45,32 +45,35 @@ final class HostsManager: ObservableObject {
         errorMessage = message
     }
 
-    private let profilesKey = "HostsEditorProfiles"
-    private let baseContentKey = "HostsEditorBaseContent"
+    private let database: AppDatabase
     private var pendingPrivilegedOperation: PendingPrivilegedOperation?
 
     /// 系统 hosts 中不属于任何方案的原始部分
     private(set) var baseSystemContent: String = ""
 
-    private init() {
+    init(database: AppDatabase? = nil) {
+        self.database = database ?? .shared
         loadProfiles()
-        baseSystemContent = UserDefaults.standard.string(forKey: baseContentKey) ?? ""
+        baseSystemContent = loadBaseSystemContent()
     }
 
     // MARK: - Persistence
 
     func loadProfiles() {
-        guard let data = UserDefaults.standard.data(forKey: profilesKey),
-              let decoded = try? JSONDecoder().decode([HostsProfile].self, from: data) else {
+        guard let loadedProfiles = try? database.loadProfiles(),
+              !loadedProfiles.isEmpty else {
             profiles = [HostsProfile(name: L10n.tr("hosts.default_profile_name"), content: "")]
             return
         }
-        profiles = decoded.isEmpty ? [HostsProfile(name: L10n.tr("hosts.default_profile_name"), content: "")] : decoded
+        profiles = loadedProfiles
     }
 
     func saveProfiles() {
-        guard let data = try? JSONEncoder().encode(profiles) else { return }
-        UserDefaults.standard.set(data, forKey: profilesKey)
+        do {
+            try database.saveProfiles(profiles)
+        } catch {
+            NSLog("Failed to persist profiles: %@", String(describing: error))
+        }
     }
 
     // MARK: - Profile CRUD
@@ -142,7 +145,7 @@ final class HostsManager: ObservableObject {
             currentSystemContent = content
             let base = Self.extractBaseContent(from: content)
             baseSystemContent = base
-            UserDefaults.standard.set(base, forKey: baseContentKey)
+            persistBaseSystemContent(base)
             errorMessage = nil
         } catch {
             handlePrivilegedOperationError(error, operation: L10n.tr("operation.read_system_hosts"))
@@ -156,7 +159,7 @@ final class HostsManager: ObservableObject {
             currentSystemContent = verifiedContent
             let base = Self.extractBaseContent(from: verifiedContent)
             baseSystemContent = base
-            UserDefaults.standard.set(base, forKey: baseContentKey)
+            persistBaseSystemContent(base)
             pendingPrivilegedOperation = nil
             errorMessage = nil
         } catch {
@@ -223,6 +226,25 @@ final class HostsManager: ObservableObject {
             result = regex.stringByReplacingMatches(in: result, range: range, withTemplate: "\n\n")
         }
         return result.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func loadBaseSystemContent() -> String {
+        do {
+            if case .string(let storedBaseContent)? = try database.settingValue(.baseSystemContent) {
+                return storedBaseContent
+            }
+        } catch {
+            NSLog("Failed to load base system content: %@", String(describing: error))
+        }
+        return ""
+    }
+
+    private func persistBaseSystemContent(_ content: String) {
+        do {
+            try database.saveSetting(.baseSystemContent, value: .string(content))
+        } catch {
+            NSLog("Failed to persist base system content: %@", String(describing: error))
+        }
     }
 
     // MARK: - Remote

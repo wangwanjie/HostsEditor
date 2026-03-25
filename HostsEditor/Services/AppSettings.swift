@@ -38,20 +38,12 @@ final class AppSettings: ObservableObject {
     static let minSidebarWidth: Double = 160
     static let maxSidebarWidth: Double = 420
 
-    private enum Keys {
-        static let updateCheckStrategy = "HostsEditorUpdateCheckStrategy"
-        static let appLanguage = "HostsEditorAppLanguage"
-        static let appAppearance = "HostsEditorAppAppearance"
-        static let editorFontSize = "HostsEditorEditorFontSize"
-        static let sidebarWidth = "HostsEditorSidebarWidth"
-    }
-
-    private let defaults: UserDefaults
+    private let database: AppDatabase
 
     @Published var appLanguage: AppLanguage {
         didSet {
             guard oldValue != appLanguage else { return }
-            defaults.set(appLanguage.rawValue, forKey: Keys.appLanguage)
+            persistSetting(.appLanguage, value: .string(appLanguage.rawValue))
             AppLocalization.shared.setLanguage(appLanguage)
         }
     }
@@ -59,7 +51,7 @@ final class AppSettings: ObservableObject {
     @Published var appAppearance: AppAppearance {
         didSet {
             guard oldValue != appAppearance else { return }
-            defaults.set(appAppearance.rawValue, forKey: Keys.appAppearance)
+            persistSetting(.appAppearance, value: .string(appAppearance.rawValue))
             AppearanceManager.shared.apply(appAppearance)
         }
     }
@@ -67,7 +59,7 @@ final class AppSettings: ObservableObject {
     @Published var updateCheckStrategy: UpdateCheckStrategy {
         didSet {
             guard oldValue != updateCheckStrategy else { return }
-            defaults.set(updateCheckStrategy.rawValue, forKey: Keys.updateCheckStrategy)
+            persistSetting(.updateCheckStrategy, value: .string(updateCheckStrategy.rawValue))
         }
     }
 
@@ -79,7 +71,7 @@ final class AppSettings: ObservableObject {
                 return
             }
             guard oldValue != editorFontSize else { return }
-            defaults.set(editorFontSize, forKey: Keys.editorFontSize)
+            persistSetting(.editorFontSize, value: .double(editorFontSize))
         }
     }
 
@@ -91,45 +83,20 @@ final class AppSettings: ObservableObject {
                 return
             }
             guard oldValue != sidebarWidth else { return }
-            defaults.set(sidebarWidth, forKey: Keys.sidebarWidth)
+            persistSetting(.sidebarWidth, value: .double(sidebarWidth))
         }
     }
 
-    init(defaults: UserDefaults = .standard) {
-        self.defaults = defaults
+    init(database: AppDatabase? = nil) {
+        self.database = database ?? .shared
 
-        if let rawLanguage = defaults.string(forKey: Keys.appLanguage),
-           let language = AppLanguage(rawValue: rawLanguage) {
-            appLanguage = language
-        } else {
-            appLanguage = Self.defaultLanguage
-        }
+        appLanguage = Self.defaultLanguage
+        appAppearance = Self.defaultAppearance
+        updateCheckStrategy = Self.defaultUpdateCheckStrategy
+        editorFontSize = Self.defaultEditorFontSize
+        sidebarWidth = Self.defaultSidebarWidth
 
-        if let rawAppearance = defaults.string(forKey: Keys.appAppearance),
-           let appearance = AppAppearance(rawValue: rawAppearance) {
-            appAppearance = appearance
-        } else {
-            appAppearance = Self.defaultAppearance
-        }
-
-        if let rawValue = defaults.string(forKey: Keys.updateCheckStrategy),
-           let strategy = UpdateCheckStrategy(rawValue: rawValue) {
-            updateCheckStrategy = strategy
-        } else {
-            updateCheckStrategy = Self.defaultUpdateCheckStrategy
-        }
-
-        if defaults.object(forKey: Keys.editorFontSize) != nil {
-            editorFontSize = Self.clampedEditorFontSize(defaults.double(forKey: Keys.editorFontSize))
-        } else {
-            editorFontSize = Self.defaultEditorFontSize
-        }
-
-        if defaults.object(forKey: Keys.sidebarWidth) != nil {
-            sidebarWidth = Self.clampedSidebarWidth(defaults.double(forKey: Keys.sidebarWidth))
-        } else {
-            sidebarWidth = Self.defaultSidebarWidth
-        }
+        loadPersistedValues()
 
         AppLocalization.shared.setLanguage(appLanguage)
         AppearanceManager.shared.apply(appAppearance)
@@ -157,5 +124,42 @@ final class AppSettings: ObservableObject {
 
     static func clampedSidebarWidth(_ width: Double) -> Double {
         min(max(width.rounded(), minSidebarWidth), maxSidebarWidth)
+    }
+
+    private func loadPersistedValues() {
+        do {
+            if case .string(let rawLanguage)? = try database.settingValue(.appLanguage),
+               let language = AppLanguage(rawValue: rawLanguage) {
+                appLanguage = language
+            }
+
+            if case .string(let rawAppearance)? = try database.settingValue(.appAppearance),
+               let appearance = AppAppearance(rawValue: rawAppearance) {
+                appAppearance = appearance
+            }
+
+            if case .string(let rawStrategy)? = try database.settingValue(.updateCheckStrategy),
+               let strategy = UpdateCheckStrategy(rawValue: rawStrategy) {
+                updateCheckStrategy = strategy
+            }
+
+            if case .double(let storedFontSize)? = try database.settingValue(.editorFontSize) {
+                editorFontSize = Self.clampedEditorFontSize(storedFontSize)
+            }
+
+            if case .double(let storedSidebarWidth)? = try database.settingValue(.sidebarWidth) {
+                sidebarWidth = Self.clampedSidebarWidth(storedSidebarWidth)
+            }
+        } catch {
+            NSLog("Failed to load AppSettings from database: %@", String(describing: error))
+        }
+    }
+
+    private func persistSetting(_ key: AppSettingKey, value: AppSettingValue) {
+        do {
+            try database.saveSetting(key, value: value)
+        } catch {
+            NSLog("Failed to persist AppSettings key %@: %@", key.rawValue, String(describing: error))
+        }
     }
 }

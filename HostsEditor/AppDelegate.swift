@@ -15,14 +15,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var statusMenu: NSMenu?
     private var profileMenuItems: [NSMenuItem] = []
-    private let preferencesWindowController = PreferencesWindowController.shared
+    private lazy var preferencesWindowController = PreferencesWindowController.shared
     private var isPresentingHelperInterventionAlert = false
     private var shouldRetryPendingOperationAfterActivation = false
     private var cancellables = Set<AnyCancellable>()
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
+        do {
+            try AppDatabase.shared.runStartupMigrationIfNeeded()
+        } catch {
+            NSLog("Business data migration failed: %@", String(describing: error))
+        }
+
         _ = AppSettings.shared
-        
+
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handleHelperInterventionNotification(_:)),

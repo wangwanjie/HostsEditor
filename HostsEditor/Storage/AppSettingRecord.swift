@@ -8,6 +8,23 @@ enum AppSettingKey: String, Codable, CaseIterable {
     case updateCheckStrategy = "update_check_strategy"
     case editorFontSize = "editor_font_size"
     case sidebarWidth = "sidebar_width"
+
+    var legacyUserDefaultsKey: String {
+        switch self {
+        case .baseSystemContent:
+            return "HostsEditorBaseContent"
+        case .appLanguage:
+            return "HostsEditorAppLanguage"
+        case .appAppearance:
+            return "HostsEditorAppAppearance"
+        case .updateCheckStrategy:
+            return "HostsEditorUpdateCheckStrategy"
+        case .editorFontSize:
+            return "HostsEditorEditorFontSize"
+        case .sidebarWidth:
+            return "HostsEditorSidebarWidth"
+        }
+    }
 }
 
 enum AppSettingValue: Codable, Equatable {

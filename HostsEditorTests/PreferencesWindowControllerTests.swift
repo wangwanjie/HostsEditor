@@ -8,20 +8,17 @@ struct PreferencesWindowControllerTests {
     @MainActor
     @Test
     func preferencesRefreshesLocalizedTitlesWhenLanguageChanges() throws {
-        let suiteName = "HostsEditorTests.PreferencesWindowControllerTests.Language"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defaults.removePersistentDomain(forName: suiteName)
+        let database = try AppDatabase.inMemory()
 
         let originalLanguage = AppLocalization.shared.language
         let originalAppearance = NSApplication.shared.appearance
 
         defer {
-            defaults.removePersistentDomain(forName: suiteName)
             AppLocalization.shared.setLanguage(originalLanguage)
             NSApplication.shared.appearance = originalAppearance
         }
 
-        let settings = AppSettings(defaults: defaults)
+        let settings = AppSettings(database: database)
         let controller = PreferencesWindowController(updateManager: .shared, settings: settings)
         controller.loadWindow()
 
@@ -42,20 +39,17 @@ struct PreferencesWindowControllerTests {
     @MainActor
     @Test
     func preferencesFollowsRuntimeAppearanceSelection() throws {
-        let suiteName = "HostsEditorTests.PreferencesWindowControllerTests.Appearance"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defaults.removePersistentDomain(forName: suiteName)
+        let database = try AppDatabase.inMemory()
 
         let originalLanguage = AppLocalization.shared.language
         let originalAppearance = NSApplication.shared.appearance
 
         defer {
-            defaults.removePersistentDomain(forName: suiteName)
             AppLocalization.shared.setLanguage(originalLanguage)
             NSApplication.shared.appearance = originalAppearance
         }
 
-        let settings = AppSettings(defaults: defaults)
+        let settings = AppSettings(database: database)
         let controller = PreferencesWindowController(updateManager: .shared, settings: settings)
         controller.loadWindow()
 
@@ -69,20 +63,17 @@ struct PreferencesWindowControllerTests {
     @MainActor
     @Test
     func preferencesRecomputesSegmentWidthsWhenLanguageChanges() throws {
-        let suiteName = "HostsEditorTests.PreferencesWindowControllerTests.SegmentWidths"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defaults.removePersistentDomain(forName: suiteName)
+        let database = try AppDatabase.inMemory()
 
         let originalLanguage = AppLocalization.shared.language
         let originalAppearance = NSApplication.shared.appearance
 
         defer {
-            defaults.removePersistentDomain(forName: suiteName)
             AppLocalization.shared.setLanguage(originalLanguage)
             NSApplication.shared.appearance = originalAppearance
         }
 
-        let settings = AppSettings(defaults: defaults)
+        let settings = AppSettings(database: database)
         let controller = PreferencesWindowController(updateManager: .shared, settings: settings)
         controller.loadWindow()
 

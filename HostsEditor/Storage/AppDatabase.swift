@@ -2,6 +2,14 @@ import Foundation
 import GRDB
 
 final class AppDatabase {
+    static let shared: AppDatabase = {
+        do {
+            return try AppDatabase(configuration: AppDatabaseConfiguration(databasePath: defaultDatabasePath()))
+        } catch {
+            fatalError("Failed to initialize AppDatabase.shared: \(error)")
+        }
+    }()
+
     let dbQueue: DatabaseQueue
 
     init(configuration: AppDatabaseConfiguration) throws {
@@ -66,6 +74,22 @@ final class AppDatabase {
             var record = ProfileRecord(profile: profile, sortIndex: index)
             try record.insert(db)
         }
+    }
+
+    func runStartupMigrationIfNeeded(defaults: UserDefaults = .standard) throws {
+        try BusinessDataMigrator(defaults: defaults, database: self).migrateIfNeeded()
+    }
+
+    private static func defaultDatabasePath(fileManager: FileManager = .default) throws -> String {
+        let appSupportURL = try fileManager.url(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true
+        )
+        let databaseDirectory = appSupportURL.appendingPathComponent("HostsEditor", isDirectory: true)
+        try fileManager.createDirectory(at: databaseDirectory, withIntermediateDirectories: true)
+        return databaseDirectory.appendingPathComponent("hostseditor.sqlite").path
     }
 
     private var migrator: DatabaseMigrator {
