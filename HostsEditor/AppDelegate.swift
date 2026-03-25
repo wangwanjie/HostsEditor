@@ -21,7 +21,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var cancellables = Set<AnyCancellable>()
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
-        DebugRuntime.start()
         _ = AppSettings.shared
         
         NotificationCenter.default.addObserver(

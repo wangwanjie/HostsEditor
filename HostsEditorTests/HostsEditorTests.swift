@@ -12,10 +12,6 @@ import Testing
 
 struct HostsEditorTests {
 
-    @Test func productionTargetDoesNotEnableViewScope() async throws {
-        #expect(!DebugRuntime.isViewScopeEnabled)
-    }
-
     @Test func releaseVersionIgnoresLeadingVAndTrailingZeros() async throws {
         #expect(ReleaseVersion("v1.0") == ReleaseVersion("1.0.0"))
     }
