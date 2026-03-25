@@ -15,6 +15,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var statusMenu: NSMenu?
     private var profileMenuItems: [NSMenuItem] = []
+    private var mainWindowController: NSWindowController?
     private lazy var preferencesWindowController = PreferencesWindowController.shared
     private var isPresentingHelperInterventionAlert = false
     private var shouldRetryPendingOperationAfterActivation = false
@@ -37,6 +38,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         )
         bindLocalization()
         buildMainMenu()
+        retainExistingMainWindowControllerIfNeeded()
         setupStatusBar()
         UpdateManager.shared.configure()
         UpdateManager.shared.scheduleBackgroundUpdateCheck()
@@ -173,6 +175,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldSaveApplicationState(_ app: NSApplication) -> Bool {
         return false
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !flag {
+            openMainWindow()
+        }
+        return true
     }
 
     // MARK: - 帮助程序安装
@@ -421,13 +430,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func openMainWindow() {
         NSApp.activate(ignoringOtherApps: true)
-        NSApp.windows.first { $0.canBecomeMain }?.makeKeyAndOrderFront(nil)
-        if NSApp.windows.first(where: { $0.canBecomeMain }) == nil {
-            // 若没有窗口则从 storyboard 打开
-            let storyboard = NSStoryboard(name: "Main", bundle: nil)
-            guard let wc = storyboard.instantiateController(withIdentifier: "WindowController") as? NSWindowController else { return }
-            wc.showWindow(nil)
-        }
+        guard let windowController = ensureMainWindowController() else { return }
+        windowController.showWindow(nil)
+        windowController.window?.makeKeyAndOrderFront(nil)
     }
 
     @objc private func applyProfileFromMenu(_ sender: NSMenuItem) {
@@ -452,6 +457,50 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.rebuildStatusMenu()
             }
             .store(in: &cancellables)
+    }
+
+    private func retainExistingMainWindowControllerIfNeeded() {
+        guard mainWindowController == nil else { return }
+        let controller = NSApp.windows
+            .compactMap(\.windowController)
+            .first(where: { $0.window?.contentViewController is ViewController })
+        if let controller {
+            configureMainWindowController(controller)
+            mainWindowController = controller
+        }
+    }
+
+    private func ensureMainWindowController() -> NSWindowController? {
+        retainExistingMainWindowControllerIfNeeded()
+        if let mainWindowController {
+            configureMainWindowController(mainWindowController)
+            return mainWindowController
+        }
+
+        let storyboard = NSStoryboard(name: "Main", bundle: nil)
+        guard let windowController = storyboard.instantiateController(withIdentifier: "WindowController") as? NSWindowController else {
+            return nil
+        }
+
+        configureMainWindowController(windowController)
+        mainWindowController = windowController
+        return windowController
+    }
+
+    private func configureMainWindowController(_ windowController: NSWindowController) {
+        windowController.window?.isReleasedWhenClosed = false
+    }
+
+    func loadMainWindowControllerForTesting() {
+        _ = ensureMainWindowController()
+    }
+
+    func closeMainWindowForTesting() {
+        ensureMainWindowController()?.close()
+    }
+
+    var debugMainWindow: NSWindow? {
+        ensureMainWindowController()?.window
     }
 }
 

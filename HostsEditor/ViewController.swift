@@ -28,8 +28,8 @@ class ViewController: NSViewController {
 
     private static let mainWindowFrameAutosaveName = NSWindow.FrameAutosaveName("HostsEditorMainWindowFrame")
 
-    private let manager = HostsManager.shared
-    private let settings = AppSettings.shared
+    private let manager: HostsManager
+    private let settings: AppSettings
     private var cancellables = Set<AnyCancellable>()
 
     private var splitView: NSSplitView!
@@ -55,6 +55,20 @@ class ViewController: NSViewController {
     private var isReplaceBarExpanded = false
     private var findMatches: [NSRange] = []
     private var currentFindMatchIndex: Int?
+
+    @MainActor
+    init(manager: HostsManager? = nil, settings: AppSettings? = nil) {
+        self.manager = manager ?? .shared
+        self.settings = settings ?? .shared
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    @MainActor
+    required init?(coder: NSCoder) {
+        manager = .shared
+        settings = .shared
+        super.init(coder: coder)
+    }
 
     /// 左侧选中项：系统（当前 hosts 全文）、默认（仅基底，不含 HostsEditor 块）、或某个方案
     private enum SidebarSelection: Equatable {
@@ -414,6 +428,7 @@ class ViewController: NSViewController {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 self?.reloadTablePreservingSelection()
+                self?.refreshEditorForCurrentSelectionAfterProfilesChange()
                 self?.updateButtonsForSelection()
             }
             .store(in: &cancellables)
@@ -509,6 +524,23 @@ class ViewController: NSViewController {
         editorTextView.breakUndoCoalescing()
         refreshFindResults(scrollToCurrent: false)
         updateButtonsForSelection()
+    }
+
+    private func refreshEditorForCurrentSelectionAfterProfilesChange() {
+        guard case .profile(let id) = selection else { return }
+
+        guard let profile = manager.profile(for: id) else {
+            pendingEdits.removeValue(forKey: id)
+            selection = .system
+            profileTableView?.selectRowIndexes(IndexSet(integer: systemRow), byExtendingSelection: false)
+            return
+        }
+
+        let expectedEditorContent = pendingEdits[id] ?? profile.content
+        guard editorTextView.string != expectedEditorContent || lastSyncedContent != profile.content else { return }
+
+        syncEditorFromSelection()
+        editorTextView.rehighlightEntireDocument()
     }
 
     private var isContentDirty: Bool { editorTextView.string != lastSyncedContent }
@@ -1153,5 +1185,28 @@ extension ViewController {
 
     var debugReplacePlaceholder: String {
         findBarView.replaceField.placeholderString ?? ""
+    }
+
+    var debugEditorString: String {
+        editorTextView?.string ?? ""
+    }
+
+    var debugDidTriggerFullRehighlight: Bool {
+        editorTextView?.didTriggerFullRehighlight ?? false
+    }
+
+    func selectProfileForTesting(id: String) {
+        guard isViewLoaded else { return }
+        let targetSelection = SidebarSelection.profile(id)
+        let targetRow = row(for: targetSelection)
+        profileTableView?.selectRowIndexes(IndexSet(integer: targetRow), byExtendingSelection: false)
+        selection = targetSelection
+        updateButtonsForSelection()
+    }
+
+    func handleProfilesDidChangeForTesting() {
+        guard isViewLoaded else { return }
+        reloadTablePreservingSelection()
+        refreshEditorForCurrentSelectionAfterProfilesChange()
     }
 }

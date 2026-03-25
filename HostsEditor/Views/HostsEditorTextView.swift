@@ -8,6 +8,7 @@ import AppKit
 final class HostsEditorTextView: NSTextView {
     private let highlighter = HostsSyntaxHighlighter()
     private var didAttachHighlighter = false
+    private(set) var didTriggerFullRehighlight = false
 
     var selectedNSRanges: [NSRange] {
         selectedRanges.map(\.rangeValue)
@@ -44,6 +45,13 @@ final class HostsEditorTextView: NSTextView {
     func setupSyntaxHighlighting() {
         didAttachHighlighter = false
         attachHighlighterIfNeeded()
+        rehighlightEntireDocument()
+    }
+
+    func rehighlightEntireDocument() {
+        attachHighlighterIfNeeded()
+        didTriggerFullRehighlight = true
+        highlighter.rehighlightEntireDocument()
     }
 
     @discardableResult

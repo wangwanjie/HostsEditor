@@ -12,7 +12,9 @@ import SnapKit
 final class PreferencesWindowController: NSWindowController {
     static let shared = PreferencesWindowController(updateManager: .shared, settings: .shared)
 
-    private static let autosaveName = NSWindow.FrameAutosaveName("HostsEditorPreferencesWindowFrame")
+    fileprivate static let autosaveName = NSWindow.FrameAutosaveName("HostsEditorPreferencesWindowFrame")
+    fileprivate static let defaultContentWidth: CGFloat = 620
+    fileprivate static let minimumContentHeight: CGFloat = 220
 
     private var cancellables = Set<AnyCancellable>()
 
@@ -26,8 +28,8 @@ final class PreferencesWindowController: NSWindowController {
         window.isReleasedWhenClosed = false
         window.isRestorable = false
         window.tabbingMode = .disallowed
-        window.setContentSize(NSSize(width: 620, height: 360))
-        window.minSize = NSSize(width: 620, height: 360)
+        window.setContentSize(NSSize(width: Self.defaultContentWidth, height: 360))
+        window.minSize = NSSize(width: Self.defaultContentWidth, height: Self.minimumContentHeight)
         super.init(window: window)
         shouldCascadeWindows = false
 
@@ -77,6 +79,10 @@ final class PreferencesWindowController: NSWindowController {
     private var preferencesViewController: PreferencesViewController {
         window?.contentViewController as! PreferencesViewController
     }
+
+    func selectSectionForTesting(index: Int) {
+        preferencesViewController.selectSectionForTesting(index: index)
+    }
 }
 
 @MainActor
@@ -105,6 +111,7 @@ private final class PreferencesViewController: NSViewController {
     private let settings: AppSettings
     private var cancellables = Set<AnyCancellable>()
     private var currentSection: PreferencesSection = .general
+    private var rootStack: NSStackView!
 
     private let sectionControl = NSSegmentedControl(labels: ["", "", "", ""], trackingMode: .selectOne, target: nil, action: nil)
 
@@ -163,7 +170,7 @@ private final class PreferencesViewController: NSViewController {
         applyLocalization()
         syncControlsFromSettings()
         syncHelperControls()
-        syncVisibleSection()
+        syncVisibleSection(animated: false)
         updateAppearanceColors()
     }
 
@@ -194,7 +201,7 @@ private final class PreferencesViewController: NSViewController {
             helperActionsRow(),
         ])
 
-        let rootStack = NSStackView(views: [sectionControl, generalSectionView, updatesSectionView, editorSectionView, helperSectionView])
+        rootStack = NSStackView(views: [sectionControl, generalSectionView, updatesSectionView, editorSectionView, helperSectionView])
         rootStack.orientation = .vertical
         rootStack.alignment = .leading
         rootStack.spacing = 18
@@ -203,7 +210,7 @@ private final class PreferencesViewController: NSViewController {
         rootStack.snp.makeConstraints { make in
             make.top.equalToSuperview().offset(22)
             make.leading.trailing.equalToSuperview().inset(24)
-            make.bottom.lessThanOrEqualToSuperview().inset(22)
+            make.bottom.equalToSuperview().inset(22)
         }
 
         sectionControl.snp.makeConstraints { make in
@@ -340,12 +347,39 @@ private final class PreferencesViewController: NSViewController {
         disableHelperButton.isEnabled = HostsManager.shared.hasRegisteredHelper
     }
 
-    private func syncVisibleSection() {
+    private func syncVisibleSection(animated: Bool) {
         sectionControl.selectedSegment = currentSection.rawValue
         generalSectionView.isHidden = currentSection != .general
         updatesSectionView.isHidden = currentSection != .updates
         editorSectionView.isHidden = currentSection != .editor
         helperSectionView.isHidden = currentSection != .helper
+        resizeWindowToFitCurrentSection(animated: animated)
+    }
+
+    private func resizeWindowToFitCurrentSection(animated: Bool) {
+        guard let window = view.window else { return }
+
+        view.layoutSubtreeIfNeeded()
+        rootStack.layoutSubtreeIfNeeded()
+
+        let contentWidth = max(PreferencesWindowController.defaultContentWidth, window.contentLayoutRect.width)
+        let contentHeight = max(
+            PreferencesWindowController.minimumContentHeight,
+            ceil(rootStack.fittingSize.height + 44)
+        )
+        let targetFrameSize = window.frameRect(
+            forContentRect: NSRect(origin: .zero, size: NSSize(width: contentWidth, height: contentHeight))
+        ).size
+
+        var frame = window.frame
+        let deltaHeight = targetFrameSize.height - frame.height
+        let deltaWidth = targetFrameSize.width - frame.width
+        guard abs(deltaHeight) > 0.5 || abs(deltaWidth) > 0.5 else { return }
+
+        frame.origin.y -= deltaHeight
+        frame.size.height += deltaHeight
+        frame.size.width += deltaWidth
+        window.setFrame(frame, display: true, animate: animated)
     }
 
     private func updateAppearanceColors() {
@@ -539,7 +573,7 @@ private final class PreferencesViewController: NSViewController {
     @objc private func sectionChanged(_ sender: NSSegmentedControl) {
         guard let section = PreferencesSection(rawValue: sender.selectedSegment) else { return }
         currentSection = section
-        syncVisibleSection()
+        syncVisibleSection(animated: true)
     }
 
     @objc private func languageChanged(_ sender: NSPopUpButton) {
@@ -682,6 +716,12 @@ private final class PreferencesViewController: NSViewController {
 
     var debugSectionLabels: [String] {
         (0..<sectionControl.segmentCount).map { sectionControl.label(forSegment: $0) ?? "" }
+    }
+
+    func selectSectionForTesting(index: Int) {
+        guard let section = PreferencesSection(rawValue: index) else { return }
+        currentSection = section
+        syncVisibleSection(animated: true)
     }
 }
 

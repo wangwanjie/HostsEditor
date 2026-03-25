@@ -11,6 +11,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 SCHEME="HostsEditor"
+WORKSPACE="HostsEditor.xcworkspace"
 CONFIGURATION="Release"
 BUILD_DIR="$PROJECT_DIR/build"
 DERIVED_DATA="$BUILD_DIR/DerivedData"
@@ -330,7 +331,8 @@ APP_PATH="$ARCHIVE_PATH/Products/Applications/HostsEditor.app"
 # 使用 archive，避免 scheme 的 BuildAction 在多 target 场景下误构建 Debug runnable target。
 # 归档（arm64 + x86_64，Release 需使用 Developer ID Application 签名）
 echo "归档 $SCHEME (Release, arm64 + x86_64)..."
-xcodebuild -scheme "$SCHEME" \
+xcodebuild -workspace "$WORKSPACE" \
+    -scheme "$SCHEME" \
     -configuration "$CONFIGURATION" \
     -derivedDataPath "$DERIVED_DATA" \
     -archivePath "$ARCHIVE_PATH" \

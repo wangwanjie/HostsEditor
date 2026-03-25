@@ -52,6 +52,11 @@ final class HostsSyntaxHighlighter: NSObject, NSTextStorageDelegate {
         applyHighlight(to: extended)
     }
 
+    func rehighlightEntireDocument() {
+        guard let textStorage else { return }
+        applyHighlight(to: NSRange(location: 0, length: textStorage.length))
+    }
+
     private func applyHighlight(to range: NSRange) {
         guard let storage = textStorage, range.length > 0, range.location < storage.length else { return }
         let string = storage.string as NSString

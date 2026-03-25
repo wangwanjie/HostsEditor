@@ -85,8 +85,10 @@ final class HostsManager: ObservableObject {
 
     func updateProfile(id: String, name: String? = nil, content: String? = nil) {
         guard let idx = profiles.firstIndex(where: { $0.id == id }) else { return }
-        if let name = name { profiles[idx].name = name }
-        if let content = content { profiles[idx].content = content }
+        var updatedProfile = profiles[idx]
+        if let name { updatedProfile.name = name }
+        if let content { updatedProfile.content = content }
+        profiles[idx] = updatedProfile
         saveProfiles()
     }
 

@@ -90,6 +90,23 @@ struct PreferencesWindowControllerTests {
                 && updatedWidths[1] > initialWidths[1]
         }
     }
+
+    @MainActor
+    @Test
+    func preferencesAnimatesWindowHeightWhenSwitchingSections() throws {
+        let database = try AppDatabase.inMemory()
+        let settings = AppSettings(database: database)
+        let controller = PreferencesWindowController(updateManager: .shared, settings: settings)
+        controller.loadWindow()
+
+        let initialHeight = try #require(controller.window?.frame.height)
+        controller.selectSectionForTesting(index: 3)
+
+        try waitUntil(description: "preferences resized after section switch") {
+            guard let updatedHeight = controller.window?.frame.height else { return false }
+            return abs(updatedHeight - initialHeight) > 1
+        }
+    }
 }
 
 @MainActor
