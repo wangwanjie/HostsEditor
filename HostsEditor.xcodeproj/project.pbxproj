@@ -9,12 +9,12 @@
 /* Begin PBXBuildFile section */
 		4E38213C1EFE67B0D3BC371E /* Pods_HostsEditorHelper.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D81B29E52819357B2536D075 /* Pods_HostsEditorHelper.framework */; };
 		65689CA981BAFEB04E5A3626 /* Pods_HostsEditor.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E7112223A64033CE825649E0 /* Pods_HostsEditor.framework */; };
+		90FCB1E89ABED0979196E8CF /* Pods_HostsEditor_HostsEditorUITests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4899064FA277D4C094AC04C7 /* Pods_HostsEditor_HostsEditorUITests.framework */; };
 		955DC8012F5E5C0000A34B51 /* HostsEditorHelper in Embed Helper */ = {isa = PBXBuildFile; fileRef = 955DC8002F5E5C0000A34B51 /* HostsEditorHelper */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		955DCA802F5E680000A34B51 /* cn.vanjay.HostsEditorHelper.plist in Copy LaunchDaemon Plist */ = {isa = PBXBuildFile; fileRef = 955DCA7F2F5E680000A34B51 /* cn.vanjay.HostsEditorHelper.plist */; };
-		A08ABB3230242FC9431AB7E3 /* Pods_HostsEditorTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A8CE90EA810D4970116BD57D /* Pods_HostsEditorTests.framework */; };
 		A1B2C3D42F6A000000A34B51 /* SnapKit in Frameworks */ = {isa = PBXBuildFile; productRef = A1B2C3D62F6A000000A34B51 /* SnapKit */; };
 		C01E9FDAB4E7D97B06326737 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 01AF1926754AF7C59AE59BA3 /* Sparkle */; };
-		C4BA1B9B2018418CB91AC117 /* Pods_HostsEditorUITests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B3A1D3F8182567E638E1237F /* Pods_HostsEditorUITests.framework */; };
+		D361351D27CB79202490166C /* Pods_HostsEditor_HostsEditorTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E95923E70FE07DEE8822B331 /* Pods_HostsEditor_HostsEditorTests.framework */; };
 		F1A2B3C42A00000100A34B51 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = F1A2B3C62A00000100A34B51 /* GRDB */; };
 /* End PBXBuildFile section */
 
@@ -69,30 +69,36 @@
 
 /* Begin PBXFileReference section */
 		3FD2AE4EE8567DD02937C5E4 /* Pods-HostsEditorTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-HostsEditorTests.debug.xcconfig"; path = "Target Support Files/Pods-HostsEditorTests/Pods-HostsEditorTests.debug.xcconfig"; sourceTree = "<group>"; };
+		4899064FA277D4C094AC04C7 /* Pods_HostsEditor_HostsEditorUITests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_HostsEditor_HostsEditorUITests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		55BC45379133DE88CE67830F /* Pods-HostsEditor.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-HostsEditor.release.xcconfig"; path = "Target Support Files/Pods-HostsEditor/Pods-HostsEditor.release.xcconfig"; sourceTree = "<group>"; };
 		63766B91D35088BF1EE31A44 /* Pods-HostsEditor.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-HostsEditor.debug.xcconfig"; path = "Target Support Files/Pods-HostsEditor/Pods-HostsEditor.debug.xcconfig"; sourceTree = "<group>"; };
+		70CBBDFF806E47815DAF9C48 /* Pods-HostsEditor-HostsEditorUITests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-HostsEditor-HostsEditorUITests.release.xcconfig"; path = "Target Support Files/Pods-HostsEditor-HostsEditorUITests/Pods-HostsEditor-HostsEditorUITests.release.xcconfig"; sourceTree = "<group>"; };
+		91F3C70ACAC52C8A05E0FFA5 /* Pods-HostsEditor-HostsEditorTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-HostsEditor-HostsEditorTests.debug.xcconfig"; path = "Target Support Files/Pods-HostsEditor-HostsEditorTests/Pods-HostsEditor-HostsEditorTests.debug.xcconfig"; sourceTree = "<group>"; };
 		955DC7AC2F5E5B9700A34B51 /* HostsEditor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HostsEditor.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		955DC7BC2F5E5B9900A34B51 /* HostsEditorTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = HostsEditorTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		955DC7C62F5E5B9900A34B51 /* HostsEditorUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = HostsEditorUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		955DC8002F5E5C0000A34B51 /* HostsEditorHelper */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = HostsEditorHelper; sourceTree = BUILT_PRODUCTS_DIR; };
 		955DCA7F2F5E680000A34B51 /* cn.vanjay.HostsEditorHelper.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = cn.vanjay.HostsEditorHelper.plist; path = HostsEditor/cn.vanjay.HostsEditorHelper.plist; sourceTree = SOURCE_ROOT; };
 		96F7F3C5386501365747102C /* Pods-HostsEditorHelper.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-HostsEditorHelper.debug.xcconfig"; path = "Target Support Files/Pods-HostsEditorHelper/Pods-HostsEditorHelper.debug.xcconfig"; sourceTree = "<group>"; };
-		A8CE90EA810D4970116BD57D /* Pods_HostsEditorTests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_HostsEditorTests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		B3A1D3F8182567E638E1237F /* Pods_HostsEditorUITests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_HostsEditorUITests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		B83DB3EF540D1024898102DC /* Pods-HostsEditor-HostsEditorUITests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-HostsEditor-HostsEditorUITests.debug.xcconfig"; path = "Target Support Files/Pods-HostsEditor-HostsEditorUITests/Pods-HostsEditor-HostsEditorUITests.debug.xcconfig"; sourceTree = "<group>"; };
+		B85CF7CEDC6110003E60C646 /* Pods-HostsEditor-HostsEditorTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-HostsEditor-HostsEditorTests.release.xcconfig"; path = "Target Support Files/Pods-HostsEditor-HostsEditorTests/Pods-HostsEditor-HostsEditorTests.release.xcconfig"; sourceTree = "<group>"; };
 		C4491A1A555549F97BBB6DE8 /* Pods-HostsEditorTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-HostsEditorTests.release.xcconfig"; path = "Target Support Files/Pods-HostsEditorTests/Pods-HostsEditorTests.release.xcconfig"; sourceTree = "<group>"; };
 		C6E891B3EEA13EE5A73AEA17 /* Pods-HostsEditorHelper.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-HostsEditorHelper.release.xcconfig"; path = "Target Support Files/Pods-HostsEditorHelper/Pods-HostsEditorHelper.release.xcconfig"; sourceTree = "<group>"; };
 		C8E76F86A4E52D2669D1E3DA /* Pods-HostsEditorUITests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-HostsEditorUITests.debug.xcconfig"; path = "Target Support Files/Pods-HostsEditorUITests/Pods-HostsEditorUITests.debug.xcconfig"; sourceTree = "<group>"; };
 		D68E2EA05D4B74E08A741D46 /* Pods-HostsEditorUITests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-HostsEditorUITests.release.xcconfig"; path = "Target Support Files/Pods-HostsEditorUITests/Pods-HostsEditorUITests.release.xcconfig"; sourceTree = "<group>"; };
 		D81B29E52819357B2536D075 /* Pods_HostsEditorHelper.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_HostsEditorHelper.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		E7112223A64033CE825649E0 /* Pods_HostsEditor.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_HostsEditor.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		E95923E70FE07DEE8822B331 /* Pods_HostsEditor_HostsEditorTests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_HostsEditor_HostsEditorTests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
 		955DCA442F5E66CC00A34B51 /* Exceptions for "HostsEditor" folder in "HostsEditor" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				appstore.png,
 				cn.vanjay.HostsEditorHelper.plist,
 				Info.plist,
+				playstore.png,
 			);
 			target = 955DC7AB2F5E5B9700A34B51 /* HostsEditor */;
 		};
@@ -140,7 +146,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A08ABB3230242FC9431AB7E3 /* Pods_HostsEditorTests.framework in Frameworks */,
+				D361351D27CB79202490166C /* Pods_HostsEditor_HostsEditorTests.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -148,7 +154,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				C4BA1B9B2018418CB91AC117 /* Pods_HostsEditorUITests.framework in Frameworks */,
+				90FCB1E89ABED0979196E8CF /* Pods_HostsEditor_HostsEditorUITests.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -174,6 +180,10 @@
 				C4491A1A555549F97BBB6DE8 /* Pods-HostsEditorTests.release.xcconfig */,
 				C8E76F86A4E52D2669D1E3DA /* Pods-HostsEditorUITests.debug.xcconfig */,
 				D68E2EA05D4B74E08A741D46 /* Pods-HostsEditorUITests.release.xcconfig */,
+				91F3C70ACAC52C8A05E0FFA5 /* Pods-HostsEditor-HostsEditorTests.debug.xcconfig */,
+				B85CF7CEDC6110003E60C646 /* Pods-HostsEditor-HostsEditorTests.release.xcconfig */,
+				B83DB3EF540D1024898102DC /* Pods-HostsEditor-HostsEditorUITests.debug.xcconfig */,
+				70CBBDFF806E47815DAF9C48 /* Pods-HostsEditor-HostsEditorUITests.release.xcconfig */,
 			);
 			path = Pods;
 			sourceTree = "<group>";
@@ -216,8 +226,8 @@
 			children = (
 				E7112223A64033CE825649E0 /* Pods_HostsEditor.framework */,
 				D81B29E52819357B2536D075 /* Pods_HostsEditorHelper.framework */,
-				A8CE90EA810D4970116BD57D /* Pods_HostsEditorTests.framework */,
-				B3A1D3F8182567E638E1237F /* Pods_HostsEditorUITests.framework */,
+				E95923E70FE07DEE8822B331 /* Pods_HostsEditor_HostsEditorTests.framework */,
+				4899064FA277D4C094AC04C7 /* Pods_HostsEditor_HostsEditorUITests.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -418,7 +428,7 @@
 			outputFileListPaths = (
 			);
 			outputPaths = (
-				"$(DERIVED_FILE_DIR)/Pods-HostsEditorTests-checkManifestLockResult.txt",
+				"$(DERIVED_FILE_DIR)/Pods-HostsEditor-HostsEditorTests-checkManifestLockResult.txt",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -484,7 +494,7 @@
 			outputFileListPaths = (
 			);
 			outputPaths = (
-				"$(DERIVED_FILE_DIR)/Pods-HostsEditorUITests-checkManifestLockResult.txt",
+				"$(DERIVED_FILE_DIR)/Pods-HostsEditor-HostsEditorUITests-checkManifestLockResult.txt",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -742,7 +752,7 @@
 		};
 		955DC7D42F5E5B9900A34B51 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 3FD2AE4EE8567DD02937C5E4 /* Pods-HostsEditorTests.debug.xcconfig */;
+			baseConfigurationReference = 91F3C70ACAC52C8A05E0FFA5 /* Pods-HostsEditor-HostsEditorTests.debug.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
@@ -764,7 +774,7 @@
 		};
 		955DC7D52F5E5B9900A34B51 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = C4491A1A555549F97BBB6DE8 /* Pods-HostsEditorTests.release.xcconfig */;
+			baseConfigurationReference = B85CF7CEDC6110003E60C646 /* Pods-HostsEditor-HostsEditorTests.release.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
@@ -786,7 +796,7 @@
 		};
 		955DC7D72F5E5B9900A34B51 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = C8E76F86A4E52D2669D1E3DA /* Pods-HostsEditorUITests.debug.xcconfig */;
+			baseConfigurationReference = B83DB3EF540D1024898102DC /* Pods-HostsEditor-HostsEditorUITests.debug.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 8;
@@ -806,7 +816,7 @@
 		};
 		955DC7D82F5E5B9900A34B51 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = D68E2EA05D4B74E08A741D46 /* Pods-HostsEditorUITests.release.xcconfig */;
+			baseConfigurationReference = 70CBBDFF806E47815DAF9C48 /* Pods-HostsEditor-HostsEditorUITests.release.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 8;
