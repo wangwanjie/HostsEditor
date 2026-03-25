@@ -1,7 +1,7 @@
 import Foundation
 import GRDB
 
-enum AppSettingKey: String, Codable, CaseIterable {
+nonisolated enum AppSettingKey: String, Codable, CaseIterable {
     case baseSystemContent = "base_system_content"
     case appLanguage = "app_language"
     case appAppearance = "app_appearance"
@@ -27,14 +27,14 @@ enum AppSettingKey: String, Codable, CaseIterable {
     }
 }
 
-enum AppSettingValue: Codable, Equatable {
+nonisolated enum AppSettingValue: Codable, Equatable, Sendable {
     case string(String)
     case double(Double)
     case bool(Bool)
     case int(Int)
 }
 
-struct AppSettingRecord: Codable, FetchableRecord, MutablePersistableRecord {
+nonisolated struct AppSettingRecord: Codable, FetchableRecord, MutablePersistableRecord, Sendable {
     static let databaseTableName = "app_settings"
 
     var key: String

@@ -140,6 +140,32 @@ struct PreferencesWindowControllerTests {
 
     @MainActor
     @Test
+    func preferencesPinsVisibleSectionCardToTopWithoutBottomConstraint() throws {
+        let database = try AppDatabase.inMemory()
+        let settings = AppSettings(database: database)
+        let controller = PreferencesWindowController(updateManager: .shared, settings: settings)
+        controller.showPreferencesWindow()
+
+        try waitUntil(description: "preferences window visible for section card constraints") {
+            controller.window?.isVisible == true
+        }
+
+        controller.selectSectionForTesting(index: 3)
+        try waitUntil(description: "preferences switched to helper section") {
+            controller.window?.contentView.flatMap(findVisiblePreferenceSection(in:)) != nil
+        }
+
+        let contentView = try #require(controller.window?.contentView)
+        let sectionContainer = try #require(findPreferencesSectionContainer(in: controller.window))
+        let visibleSection = try #require(findVisiblePreferenceSection(in: contentView))
+
+        #expect(hasConstraint(for: visibleSection, attribute: .top, in: sectionContainer))
+        #expect(hasConstraint(for: visibleSection, attribute: .bottom, in: sectionContainer) == false)
+        #expect(hasHeightConstraint(on: visibleSection))
+    }
+
+    @MainActor
+    @Test
     func preferencesDoesNotKeepCollapsedHeightConstraintOnSectionContainer() throws {
         let database = try AppDatabase.inMemory()
         let settings = AppSettings(database: database)
@@ -176,6 +202,56 @@ struct PreferencesWindowControllerTests {
         let contentView = try #require(controller.window?.contentView)
         let sampledScreenTopValues = try sampleVisibleSectionScreenTopValues(in: contentView, while: {
             controller.selectSectionForTesting(index: 1)
+        })
+
+        #expect(sampledScreenTopValues.count <= 2)
+    }
+
+    @MainActor
+    @Test
+    func preferencesKeepsVisibleSectionContentTopStableWhenGrowingToTallerSection() throws {
+        let database = try AppDatabase.inMemory()
+        let settings = AppSettings(database: database)
+        let controller = PreferencesWindowController(updateManager: .shared, settings: settings)
+        controller.showPreferencesWindow()
+
+        try waitUntil(description: "preferences window visible for content top sampling") {
+            controller.window?.isVisible == true
+        }
+
+        let contentView = try #require(controller.window?.contentView)
+        let sampledScreenTopValues = try sampleVisibleSectionContentScreenTopValues(in: contentView, while: {
+            controller.selectSectionForTesting(index: 1)
+        })
+
+        #expect(sampledScreenTopValues.count <= 2)
+    }
+
+    @MainActor
+    @Test
+    func preferencesKeepsVisibleSectionFirstRowTopStableWhenGrowingToTallerSection() throws {
+        let database = try AppDatabase.inMemory()
+        let settings = AppSettings(database: database)
+        let controller = PreferencesWindowController(updateManager: .shared, settings: settings)
+        controller.showPreferencesWindow()
+
+        try waitUntil(description: "preferences window visible for first row top sampling") {
+            controller.window?.isVisible == true
+        }
+
+        controller.selectSectionForTesting(index: 2)
+        try waitUntil(description: "preferences switched to short editor section") {
+            let contentView = controller.window?.contentView
+            guard let visibleSection = contentView.flatMap(findVisiblePreferenceSection(in:)),
+                  let contentStack = visibleSection.subviews.first as? NSStackView else {
+                return false
+            }
+            return contentStack.arrangedSubviews.count == 1
+        }
+
+        let contentView = try #require(controller.window?.contentView)
+        let sampledScreenTopValues = try sampleVisibleSectionFirstRowScreenTopValues(in: contentView, while: {
+            controller.selectSectionForTesting(index: 3)
         })
 
         #expect(sampledScreenTopValues.count <= 2)
@@ -292,6 +368,77 @@ private func sampleVisibleSectionScreenTopValues(in contentView: NSView, while a
 }
 
 @MainActor
+private func sampleVisibleSectionContentScreenTopValues(in contentView: NSView, while action: () -> Void) throws -> [CGFloat] {
+    action()
+
+    var sampledValues: [CGFloat] = []
+    let deadline = Date().addingTimeInterval(0.35)
+    while Date() < deadline {
+        contentView.layoutSubtreeIfNeeded()
+        guard let visibleSection = findVisiblePreferenceSection(in: contentView),
+              let contentStack = visibleSection.subviews.first,
+              let window = contentStack.window else {
+            RunLoop.main.run(until: Date().addingTimeInterval(0.03))
+            continue
+        }
+
+        let stackRectInWindow = contentStack.convert(contentStack.bounds, to: nil)
+        let stackRectOnScreen = window.convertToScreen(stackRectInWindow)
+        let roundedTop = (stackRectOnScreen.maxY * 10).rounded() / 10
+        if sampledValues.last != roundedTop {
+            sampledValues.append(roundedTop)
+        }
+        RunLoop.main.run(until: Date().addingTimeInterval(0.03))
+    }
+
+    if sampledValues.isEmpty {
+        throw NSError(
+            domain: "HostsEditorTests.Sampling",
+            code: 2,
+            userInfo: [NSLocalizedDescriptionKey: "Failed to sample preferences visible section content screen top during window animation."]
+        )
+    }
+
+    return sampledValues
+}
+
+@MainActor
+private func sampleVisibleSectionFirstRowScreenTopValues(in contentView: NSView, while action: () -> Void) throws -> [CGFloat] {
+    action()
+
+    var sampledValues: [CGFloat] = []
+    let deadline = Date().addingTimeInterval(0.35)
+    while Date() < deadline {
+        contentView.layoutSubtreeIfNeeded()
+        guard let visibleSection = findVisiblePreferenceSection(in: contentView),
+              let contentStack = visibleSection.subviews.first as? NSStackView,
+              let firstRow = contentStack.arrangedSubviews.first,
+              let window = firstRow.window else {
+            RunLoop.main.run(until: Date().addingTimeInterval(0.03))
+            continue
+        }
+
+        let rowRectInWindow = firstRow.convert(firstRow.bounds, to: nil)
+        let rowRectOnScreen = window.convertToScreen(rowRectInWindow)
+        let roundedTop = (rowRectOnScreen.maxY * 10).rounded() / 10
+        if sampledValues.last != roundedTop {
+            sampledValues.append(roundedTop)
+        }
+        RunLoop.main.run(until: Date().addingTimeInterval(0.03))
+    }
+
+    if sampledValues.isEmpty {
+        throw NSError(
+            domain: "HostsEditorTests.Sampling",
+            code: 3,
+            userInfo: [NSLocalizedDescriptionKey: "Failed to sample preferences visible section first row screen top during window animation."]
+        )
+    }
+
+    return sampledValues
+}
+
+@MainActor
 private func findVisiblePreferenceSection(in view: NSView) -> NSView? {
     if view.isHidden == false,
        view.layer?.cornerRadius == 12 {
@@ -326,4 +473,22 @@ private func findPreferencesSectionContainer(in view: NSView) -> NSView? {
     }
 
     return nil
+}
+
+@MainActor
+private func hasConstraint(for view: NSView, attribute: NSLayoutConstraint.Attribute, in container: NSView) -> Bool {
+    container.constraints.contains { constraint in
+        let isFirstMatch = constraint.firstItem as? NSView === view && constraint.firstAttribute == attribute
+        let isSecondMatch = constraint.secondItem as? NSView === view && constraint.secondAttribute == attribute
+        return isFirstMatch || isSecondMatch
+    }
+}
+
+@MainActor
+private func hasHeightConstraint(on view: NSView) -> Bool {
+    view.constraints.contains { constraint in
+        constraint.firstItem as? NSView === view
+            && constraint.firstAttribute == .height
+            && constraint.relation == .equal
+    }
 }

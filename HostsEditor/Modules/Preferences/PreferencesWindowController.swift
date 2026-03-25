@@ -117,6 +117,8 @@ private final class PreferencesViewController: NSViewController {
     private var sectionContainerView: NSView!
     private var activeSectionView: NSView?
     private var sectionControlWidthConstraint: NSLayoutConstraint?
+    private var sectionContainerHeightConstraint: NSLayoutConstraint?
+    private var activeSectionHeightConstraint: NSLayoutConstraint?
 
     private let sectionControl = NSSegmentedControl(labels: ["", "", "", ""], trackingMode: .selectOne, target: nil, action: nil)
 
@@ -216,6 +218,8 @@ private final class PreferencesViewController: NSViewController {
         sectionContainerView = NSView()
         sectionContainerView.translatesAutoresizingMaskIntoConstraints = false
         sectionContainerView.identifier = NSUserInterfaceItemIdentifier("preferences.sectionContainer")
+        sectionContainerView.wantsLayer = true
+        sectionContainerView.layer?.masksToBounds = true
         sectionControl.setContentHuggingPriority(.required, for: .horizontal)
         sectionControl.setContentCompressionResistancePriority(.required, for: .horizontal)
         sectionContainerView.setContentHuggingPriority(.required, for: .vertical)
@@ -230,10 +234,11 @@ private final class PreferencesViewController: NSViewController {
         }
         sectionControlWidthConstraint = sectionControl.widthAnchor.constraint(equalToConstant: 0)
         sectionControlWidthConstraint?.isActive = true
+        sectionContainerHeightConstraint = sectionContainerView.heightAnchor.constraint(equalToConstant: 1)
+        sectionContainerHeightConstraint?.isActive = true
         sectionContainerView.snp.makeConstraints { make in
             make.top.equalTo(sectionControl.snp.bottom).offset(PreferencesWindowController.sectionSpacing)
             make.leading.trailing.equalToSuperview().inset(24)
-            make.bottom.lessThanOrEqualToSuperview().inset(22)
         }
 
         installCurrentSectionViewIfNeeded(force: true)
@@ -373,30 +378,32 @@ private final class PreferencesViewController: NSViewController {
     }
 
     private func syncVisibleSection(animated: Bool) {
+        let desiredSectionView = currentSectionView()
+        let targetSectionHeight = fittingHeight(for: desiredSectionView)
         sectionControl.selectedSegment = currentSection.rawValue
-        installCurrentSectionViewIfNeeded(force: false)
+        installCurrentSectionViewIfNeeded(force: false, targetSectionHeight: targetSectionHeight)
+        sectionContainerHeightConstraint?.constant = targetSectionHeight
+        activeSectionHeightConstraint?.constant = targetSectionHeight
         sectionContainerView.needsLayout = true
         sectionContainerView.layoutSubtreeIfNeeded()
         view.needsLayout = true
         view.layoutSubtreeIfNeeded()
-        resizeWindowToFitCurrentSection(animated: animated)
+        resizeWindowToFitSectionHeight(targetSectionHeight, animated: animated)
     }
 
-    private func resizeWindowToFitCurrentSection(animated: Bool) {
+    private func resizeWindowToFitSectionHeight(_ sectionHeight: CGFloat, animated: Bool) {
         guard let window = view.window else { return }
 
-        let visibleSectionView = currentSectionView()
         window.contentView?.layoutSubtreeIfNeeded()
         view.layoutSubtreeIfNeeded()
         sectionContainerView.layoutSubtreeIfNeeded()
-        visibleSectionView.layoutSubtreeIfNeeded()
 
         let contentWidth = max(PreferencesWindowController.defaultContentWidth, window.contentLayoutRect.width)
         let contentHeight = max(
             PreferencesWindowController.minimumContentHeight,
             ceil(
                 sectionControl.fittingSize.height
-                    + visibleSectionView.fittingSize.height
+                    + sectionHeight
                     + PreferencesWindowController.sectionSpacing
                     + PreferencesWindowController.verticalContentInsets
             )
@@ -425,21 +432,32 @@ private final class PreferencesViewController: NSViewController {
         }
     }
 
-    private func installCurrentSectionViewIfNeeded(force: Bool) {
+    private func installCurrentSectionViewIfNeeded(force: Bool, targetSectionHeight: CGFloat? = nil) {
         let desiredSectionView = currentSectionView()
-        guard force || activeSectionView !== desiredSectionView else { return }
+        let resolvedSectionHeight = targetSectionHeight ?? fittingHeight(for: desiredSectionView)
+        guard force || activeSectionView !== desiredSectionView else {
+            activeSectionHeightConstraint?.constant = resolvedSectionHeight
+            return
+        }
 
         activeSectionView?.removeFromSuperview()
+        activeSectionHeightConstraint?.isActive = false
         sectionContainerView.addSubview(desiredSectionView)
         desiredSectionView.setContentHuggingPriority(.required, for: .vertical)
         desiredSectionView.setContentCompressionResistancePriority(.required, for: .vertical)
         desiredSectionView.snp.remakeConstraints { make in
             make.top.leading.trailing.equalToSuperview()
-            make.bottom.equalToSuperview()
         }
+        activeSectionHeightConstraint = desiredSectionView.heightAnchor.constraint(equalToConstant: resolvedSectionHeight)
+        activeSectionHeightConstraint?.isActive = true
         activeSectionView = desiredSectionView
         sectionContainerView.needsLayout = true
         sectionContainerView.layoutSubtreeIfNeeded()
+    }
+
+    private func fittingHeight(for sectionView: NSView) -> CGFloat {
+        sectionView.layoutSubtreeIfNeeded()
+        return ceil(sectionView.fittingSize.height)
     }
 
     private func updateAppearanceColors() {
@@ -807,10 +825,10 @@ private final class PreferencesViewController: NSViewController {
 }
 
 private func resolvedCGColor(_ color: NSColor, appearance: NSAppearance) -> CGColor {
-    let previousAppearance = NSAppearance.current
-    NSAppearance.current = appearance
-    let resolvedColor = color.usingColorSpace(.deviceRGB)?.cgColor ?? color.cgColor
-    NSAppearance.current = previousAppearance
+    var resolvedColor = color.cgColor
+    appearance.performAsCurrentDrawingAppearance {
+        resolvedColor = color.usingColorSpace(.deviceRGB)?.cgColor ?? color.cgColor
+    }
     return resolvedColor
 }
 
