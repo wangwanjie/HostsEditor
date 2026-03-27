@@ -87,9 +87,15 @@ final class HostsSyntaxHighlighter: NSObject, NSTextStorageDelegate {
         let lineNSString = lineContent as NSString
         let lineSearchRange = NSRange(location: 0, length: lineNSString.length)
 
+        let isCommentLine = Self.disabledLinePattern.firstMatch(in: lineContent, options: [], range: lineSearchRange) != nil
+        if isCommentLine {
+            storage.addAttribute(.foregroundColor, value: theme.comment, range: lineRange)
+            return
+        }
+
         let commentRange = lineNSString.range(of: "#")
         if commentRange.location != NSNotFound {
-            let globalCommentRange = NSRange(location: lineRange.location + commentRange.location, length: commentRange.length)
+            let globalCommentRange = NSRange(location: lineRange.location + commentRange.location, length: lineRange.length - commentRange.location)
             storage.addAttribute(.foregroundColor, value: theme.comment, range: globalCommentRange)
         }
 
@@ -108,11 +114,6 @@ final class HostsSyntaxHighlighter: NSObject, NSTextStorageDelegate {
         if hostnameRange.location != NSNotFound {
             let globalHostnameRange = NSRange(location: lineRange.location + hostnameRange.location, length: hostnameRange.length)
             storage.addAttribute(.foregroundColor, value: theme.hostname, range: globalHostnameRange)
-        }
-
-        let isDisabledLine = Self.disabledLinePattern.firstMatch(in: lineContent, options: [], range: lineSearchRange) != nil
-        if isDisabledLine {
-            storage.addAttribute(.foregroundColor, value: theme.disabledEntry, range: lineRange)
         }
     }
 

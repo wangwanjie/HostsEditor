@@ -31,15 +31,11 @@ struct HostsSyntaxHighlighterTests {
 
     @MainActor
     @Test
-    func disabledIPv6EntryUsesDisabledEntryHighlight() {
+    func commentedIPv6EntryUsesCommentHighlightForEntireLine() {
         let storage = highlightedStorage(for: "# ::1 localhost")
         let theme = HostsHighlightTheme.forAppearance(NSApp?.effectiveAppearance)
 
-        assertColor(
-            in: storage,
-            for: "localhost",
-            equals: theme.disabledEntry
-        )
+        assertLineColor(in: storage, equals: theme.comment)
     }
 
     @MainActor
@@ -65,5 +61,18 @@ struct HostsSyntaxHighlighterTests {
         #expect(actualRGB?.greenComponent == expectedRGB?.greenComponent)
         #expect(actualRGB?.blueComponent == expectedRGB?.blueComponent)
         #expect(actualRGB?.alphaComponent == expectedRGB?.alphaComponent)
+    }
+
+    private func assertLineColor(in storage: NSTextStorage, equals expected: NSColor) {
+        for index in 0..<storage.length {
+            let actual = storage.attribute(.foregroundColor, at: index, effectiveRange: nil) as? NSColor
+            let actualRGB = actual?.usingColorSpace(.deviceRGB)
+            let expectedRGB = expected.usingColorSpace(.deviceRGB)
+
+            #expect(actualRGB?.redComponent == expectedRGB?.redComponent)
+            #expect(actualRGB?.greenComponent == expectedRGB?.greenComponent)
+            #expect(actualRGB?.blueComponent == expectedRGB?.blueComponent)
+            #expect(actualRGB?.alphaComponent == expectedRGB?.alphaComponent)
+        }
     }
 }
