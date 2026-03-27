@@ -6,6 +6,7 @@
 //
 
 import AppKit
+import Darwin
 
 struct HostsHighlightTheme {
     var comment: NSColor
@@ -37,6 +38,12 @@ struct HostsHighlightTheme {
 }
 
 final class HostsSyntaxHighlighter: NSObject, NSTextStorageDelegate {
+    private static let entryPattern = try! NSRegularExpression(
+        pattern: #"^\s*(?:#\s*)?([^\s#]+)(?:\s+([^\s#]+))?"#,
+        options: []
+    )
+    private static let disabledLinePattern = try! NSRegularExpression(pattern: #"^\s*#"#, options: [])
+
     private weak var textStorage: NSTextStorage?
     private var theme: HostsHighlightTheme { HostsHighlightTheme.forAppearance(NSApp.effectiveAppearance) }
 
@@ -62,50 +69,92 @@ final class HostsSyntaxHighlighter: NSObject, NSTextStorageDelegate {
         let string = storage.string as NSString
         let safeRange = NSRange(location: range.location, length: min(range.length, string.length - range.location))
         guard safeRange.location >= 0 else { return }
+        let highlightRange = string.lineRange(for: safeRange)
 
         storage.beginEditing()
-        storage.removeAttribute(.foregroundColor, range: safeRange)
-        storage.addAttribute(.foregroundColor, value: theme.defaultText, range: safeRange)
+        storage.removeAttribute(.foregroundColor, range: highlightRange)
+        storage.addAttribute(.foregroundColor, value: theme.defaultText, range: highlightRange)
 
-        // IPv4
-        let ipPattern = try? NSRegularExpression(pattern: "\\b(?:\\d{1,3}\\.){3}\\d{1,3}\\b", options: [])
-        ipPattern?.enumerateMatches(in: string as String, options: [], range: safeRange) { match, _, _ in
-            guard let r = match?.range else { return }
-            storage.addAttribute(.foregroundColor, value: theme.ipAddress, range: r)
-        }
-
-        // 主机名：IP 后的第一个“词”（同一行）
-        let lineRange = string.lineRange(for: safeRange)
-        let lineContent = string.substring(with: lineRange)
-        let lineStart = lineRange.location
-        let hostnamePattern = try? NSRegularExpression(pattern: "\\b(?:\\d{1,3}\\.){3}\\d{1,3}\\s+([^\\s#\n]+)", options: [])
-        let lineNS = lineContent as NSString
-        hostnamePattern?.enumerateMatches(in: lineContent, options: [], range: NSRange(location: 0, length: lineNS.length)) { match, _, _ in
-            guard let match = match, match.numberOfRanges > 1 else { return }
-            let nsHost = match.range(at: 1)
-            let globalRange = NSRange(location: lineStart + nsHost.location, length: nsHost.length)
-            if storage.length >= globalRange.location + globalRange.length {
-                storage.addAttribute(.foregroundColor, value: theme.hostname, range: globalRange)
-            }
-        }
-
-        // 普通注释：# 到行尾
-        let commentPattern = try? NSRegularExpression(pattern: "#[^\\n]*", options: [])
-        commentPattern?.enumerateMatches(in: string as String, options: [], range: safeRange) { match, _, _ in
-            guard let r = match?.range else { return }
-            storage.addAttribute(.foregroundColor, value: theme.comment, range: r)
-        }
-
-        // 被禁用的 hosts 规则：整行着色，避免看起来仍像生效条目。
-        let disabledPattern = try? NSRegularExpression(
-            pattern: "(?m)^[ \\t]*#\\s*(?:\\d{1,3}\\.){3}\\d{1,3}\\b[^\\n]*",
-            options: []
-        )
-        disabledPattern?.enumerateMatches(in: string as String, options: [], range: safeRange) { match, _, _ in
-            guard let r = match?.range else { return }
-            storage.addAttribute(.foregroundColor, value: theme.disabledEntry, range: r)
+        enumerateLineContentRanges(in: string, within: highlightRange) { lineRange in
+            applyHighlightingForLine(in: storage, string: string, lineRange: lineRange)
         }
 
         storage.endEditing()
+    }
+
+    private func applyHighlightingForLine(in storage: NSTextStorage, string: NSString, lineRange: NSRange) {
+        let lineContent = string.substring(with: lineRange)
+        let lineNSString = lineContent as NSString
+        let lineSearchRange = NSRange(location: 0, length: lineNSString.length)
+
+        let commentRange = lineNSString.range(of: "#")
+        if commentRange.location != NSNotFound {
+            let globalCommentRange = NSRange(location: lineRange.location + commentRange.location, length: commentRange.length)
+            storage.addAttribute(.foregroundColor, value: theme.comment, range: globalCommentRange)
+        }
+
+        guard let match = Self.entryPattern.firstMatch(in: lineContent, options: [], range: lineSearchRange) else { return }
+
+        let ipTokenRange = match.range(at: 1)
+        guard ipTokenRange.location != NSNotFound else { return }
+
+        let ipToken = lineNSString.substring(with: ipTokenRange)
+        guard Self.isIPAddress(ipToken) else { return }
+
+        let globalIPRange = NSRange(location: lineRange.location + ipTokenRange.location, length: ipTokenRange.length)
+        storage.addAttribute(.foregroundColor, value: theme.ipAddress, range: globalIPRange)
+
+        let hostnameRange = match.range(at: 2)
+        if hostnameRange.location != NSNotFound {
+            let globalHostnameRange = NSRange(location: lineRange.location + hostnameRange.location, length: hostnameRange.length)
+            storage.addAttribute(.foregroundColor, value: theme.hostname, range: globalHostnameRange)
+        }
+
+        let isDisabledLine = Self.disabledLinePattern.firstMatch(in: lineContent, options: [], range: lineSearchRange) != nil
+        if isDisabledLine {
+            storage.addAttribute(.foregroundColor, value: theme.disabledEntry, range: lineRange)
+        }
+    }
+
+    private func enumerateLineContentRanges(in string: NSString, within range: NSRange, using block: (NSRange) -> Void) {
+        var currentLocation = range.location
+        let endLocation = range.location + range.length
+
+        while currentLocation < endLocation {
+            let fullLineRange = string.lineRange(for: NSRange(location: currentLocation, length: 0))
+            let contentRange = contentRange(forFullLineRange: fullLineRange, in: string)
+            if contentRange.length > 0 {
+                block(contentRange)
+            }
+
+            let nextLocation = fullLineRange.location + fullLineRange.length
+            if nextLocation <= currentLocation {
+                break
+            }
+            currentLocation = nextLocation
+        }
+    }
+
+    private func contentRange(forFullLineRange fullLineRange: NSRange, in string: NSString) -> NSRange {
+        var contentRange = fullLineRange
+        while contentRange.length > 0 {
+            let lastCharacter = string.character(at: contentRange.location + contentRange.length - 1)
+            if lastCharacter == 10 || lastCharacter == 13 {
+                contentRange.length -= 1
+            } else {
+                break
+            }
+        }
+        return contentRange
+    }
+
+    private static func isIPAddress(_ token: String) -> Bool {
+        var ipv4Address = in_addr()
+        if token.withCString({ inet_pton(AF_INET, $0, &ipv4Address) == 1 }) {
+            return true
+        }
+
+        var ipv6Address = in6_addr()
+        return token.withCString { inet_pton(AF_INET6, $0, &ipv6Address) == 1 }
     }
 }
