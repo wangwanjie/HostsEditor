@@ -3,22 +3,34 @@
     <channel>
         <title>HostsEditor</title>
         <item>
+            <title>1.7.1</title>
+            <pubDate>Fri, 27 Mar 2026 17:28:48 +0800</pubDate>
+            <link>https://github.com/wangwanjie/HostsEditor/releases/tag/v1.7.1</link>
+            <sparkle:version>10</sparkle:version>
+            <sparkle:shortVersionString>1.7.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/wangwanjie/HostsEditor/releases/download/v1.7.1/HostsEditor_V_1.7.1.dmg" length="5625782" type="application/octet-stream" sparkle:edSignature="q16NBV1xoRqzRYcrg70ugMEymh0NnjUGku1DjNrcalUkD8z1hFKjyphZOqgU4DlS7pCEfMA8RNeAX1YUZUopCA==" />
+            <sparkle:deltas>
+                <enclosure url="https://raw.githubusercontent.com/wangwanjie/HostsEditor/main/HostsEditor10-9.delta" sparkle:deltaFrom="9" length="293450" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="AmU7RTDwrZe/EfWsA0NeBh39oyltelAxt3iqHVUWLGM9Cp3kY1bDFKmTZ2ckQ3FCPnHhz7tipk/RAJP4U7VADg==" />
+                <enclosure url="https://raw.githubusercontent.com/wangwanjie/HostsEditor/main/HostsEditor10-8.delta" sparkle:deltaFrom="8" length="3529686" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="FfE2A3iI0I4gaHgf8j4Kka95NLLxAct60NjdwMWzGPr7v6qRkdbrv9hGMyMPD1vSuncosVnoOZZJPMcx5bN3Dg==" />
+            </sparkle:deltas>
+            <description>&lt;h1&gt;更新内容&lt;/h1&gt;
+&lt;ul&gt;&lt;li&gt;修复配置查看和编辑器中的 hosts 文本高亮问题，IPv6 地址与对应域名现在也能正确着色显示。&lt;/li&gt;&lt;/ul&gt;</description>
+        </item>
+        <item>
             <title>1.7.0</title>
-            <pubDate>Thu, 26 Mar 2026 00:21:54 +0800</pubDate>
+            <pubDate>Fri, 27 Mar 2026 17:28:48 +0800</pubDate>
             <link>https://github.com/wangwanjie/HostsEditor/releases/tag/v1.7.0</link>
             <sparkle:version>9</sparkle:version>
             <sparkle:shortVersionString>1.7.0</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
             <enclosure url="https://github.com/wangwanjie/HostsEditor/releases/download/v1.7.0/HostsEditor_V_1.7.0.dmg" length="5627248" type="application/octet-stream" sparkle:edSignature="Yi8VSvFnRRBfPt/L3Jmv6f7hbOWgtC09UdV69DKnZyzskyDSl9IX00ghNPpzn2SY5HTB4l6sMFULu8etYfX3AA==" />
-            <sparkle:deltas>
-                <enclosure url="https://raw.githubusercontent.com/wangwanjie/HostsEditor/main/HostsEditor9-8.delta" sparkle:deltaFrom="8" length="3528966" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="977808" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="Xfj2ima5p3anHMnGCKxmLqCJBk5Iiz0tipTbzTBYWmLOIbPHdnOYF+rLLMhrNSflNwYu/vY4lsJy03xSyJOZCw==" />
-            </sparkle:deltas>
             <description>&lt;h1&gt;更新内容&lt;/h1&gt;
 &lt;ul&gt;&lt;li&gt;业务数据改为使用数据库持久化，旧版本数据会在升级后自动迁移。&lt;/li&gt;&lt;li&gt;优化偏好设置窗口交互，切换标签页时窗口高度会随内容变化，并修复多语言下的标签宽度与布局跳动问题。&lt;/li&gt;&lt;li&gt;修复主窗口关闭后点击 Dock 图标无法重新拉起的问题，并修复远程配置 host 显示偶现高亮失效。&lt;/li&gt;&lt;li&gt;修复多处界面约束与编译警告，提升整体稳定性。&lt;/li&gt;&lt;/ul&gt;</description>
         </item>
         <item>
             <title>1.6.0</title>
-            <pubDate>Thu, 26 Mar 2026 00:21:54 +0800</pubDate>
+            <pubDate>Fri, 27 Mar 2026 17:28:48 +0800</pubDate>
             <link>https://github.com/wangwanjie/HostsEditor/releases/tag/v1.6.0</link>
             <sparkle:version>8</sparkle:version>
             <sparkle:shortVersionString>1.6.0</sparkle:shortVersionString>
