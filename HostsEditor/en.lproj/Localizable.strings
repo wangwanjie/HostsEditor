@@ -8,8 +8,6 @@
 "menu.show_all" = "Show All";
 "menu.quit_app" = "Quit HostsEditor";
 "menu.file" = "File";
-"menu.new" = "New";
-"menu.open" = "Open…";
 "menu.close" = "Close";
 "menu.edit" = "Edit";
 "menu.undo" = "Undo";
@@ -154,3 +152,27 @@
 "accessibility.previous_result" = "Previous Result";
 "accessibility.next_result" = "Next Result";
 "accessibility.close_find" = "Close Find";
+
+"menu.new_local_profile" = "New Local Profile";
+"menu.new_remote_profile" = "New Remote Profile…";
+"menu.import" = "Import Hosts File…";
+"menu.save_and_apply" = "Save and Apply";
+"menu.export" = "Export Current Content…";
+"menu.show_backups" = "Show Hosts Backups in Finder";
+"main.context.duplicate" = "Duplicate";
+"main.import.message" = "Choose hosts files to import as local profiles";
+"main.import.prompt" = "Import";
+"main.import.failed" = "Failed to import %@: %@";
+"main.export.failed" = "Export failed: %@";
+"main.unsaved.title" = "You have unsaved changes";
+"main.unsaved.message" = "Some edits have not been saved and applied yet. Quitting now will discard them.";
+"main.unsaved.discard_and_quit" = "Discard and Quit";
+"hosts.duplicate_name" = "%@ Copy";
+"hosts.error.unsupported_scheme" = "Only http and https URLs are supported";
+"hosts.error.http_status" = "The server responded with HTTP %ld";
+"hosts.error.html_response" = "The URL returned a web page instead of a hosts file";
+"preferences.remote_refresh" = "Remote Refresh";
+"settings.remote_refresh.off" = "Off";
+"settings.remote_refresh.hourly" = "Every Hour";
+"settings.remote_refresh.six_hours" = "Every 6 Hours";
+"settings.remote_refresh.daily" = "Every Day";

@@ -4,6 +4,29 @@ import Combine
 extension ViewController {
     var isContentDirty: Bool { editorTextView.string != lastSyncedContent }
 
+    /// 是否存在尚未保存的修改：当前编辑器内容，或切换走的方案里暂存的编辑
+    var hasUnsavedChanges: Bool {
+        if canEditCurrentSelection && isContentDirty {
+            return true
+        }
+        return pendingEdits.contains { id, text in
+            guard let profile = manager.profile(for: id), !profile.isRemote else {
+                return false
+            }
+            // 当前选中方案以编辑器实时内容为准，已在上面判断
+            if case .profile(let currentId) = selection, currentId == id {
+                return false
+            }
+            return profile.content != text
+        }
+    }
+
+    /// 放弃所有未保存的编辑，恢复为已保存内容
+    func discardUnsavedChanges() {
+        pendingEdits.removeAll()
+        syncEditorFromSelection()
+    }
+
     func setupBindings() {
         manager.$profiles
             .receive(on: DispatchQueue.main)
@@ -135,6 +158,8 @@ extension ViewController {
             isDeletableProfile = false
         }
         removeProfileButton.isEnabled = isDeletableProfile && !manager.isLoading
+        // 关闭按钮上的小圆点提示存在未保存修改
+        view.window?.isDocumentEdited = hasUnsavedChanges
 
         refreshButton.isHidden = selection != .system
         if case .profile(let id) = selection, manager.profile(for: id)?.isRemote == true {

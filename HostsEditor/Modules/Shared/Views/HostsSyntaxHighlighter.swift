@@ -45,7 +45,8 @@ final class HostsSyntaxHighlighter: NSObject, NSTextStorageDelegate {
     private static let disabledLinePattern = try! NSRegularExpression(pattern: #"^\s*#"#, options: [])
 
     private weak var textStorage: NSTextStorage?
-    private var theme: HostsHighlightTheme { HostsHighlightTheme.forAppearance(NSApp.effectiveAppearance) }
+    /// 当前这一轮着色使用的主题，每次 applyHighlight 只计算一次，避免逐行重复创建颜色
+    private var theme = HostsHighlightTheme.forAppearance(nil)
 
     func attach(to textStorage: NSTextStorage) {
         self.textStorage = textStorage
@@ -70,6 +71,7 @@ final class HostsSyntaxHighlighter: NSObject, NSTextStorageDelegate {
         let safeRange = NSRange(location: range.location, length: min(range.length, string.length - range.location))
         guard safeRange.location >= 0 else { return }
         let highlightRange = string.lineRange(for: safeRange)
+        theme = HostsHighlightTheme.forAppearance(NSApp?.effectiveAppearance)
 
         storage.beginEditing()
         storage.removeAttribute(.foregroundColor, range: highlightRange)

@@ -30,6 +30,15 @@ final class HostsEditorTextView: NSTextView {
         attachHighlighterIfNeeded()
     }
 
+    /// 切换浅色 / 深色外观时重新着色，避免保留旧主题的颜色
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        guard didAttachHighlighter else {
+            return
+        }
+        highlighter.rehighlightEntireDocument()
+    }
+
     override func viewDidMoveToSuperview() {
         super.viewDidMoveToSuperview()
         attachHighlighterIfNeeded()

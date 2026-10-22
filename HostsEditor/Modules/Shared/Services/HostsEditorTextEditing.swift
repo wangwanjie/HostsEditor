@@ -58,7 +58,10 @@ enum HostsEditorTextEditing {
 
     nonisolated static func firstMatchIndex(containing selectionRange: NSRange, within matches: [NSRange]) -> Int? {
         matches.firstIndex { match in
-            NSIntersectionRange(match, selectionRange).length > 0 || match.location == selectionRange.location
+            // 光标（零长度选区）落在某个匹配内部时，也视为当前匹配
+            NSIntersectionRange(match, selectionRange).length > 0
+                || match.location == selectionRange.location
+                || (selectionRange.length == 0 && NSLocationInRange(selectionRange.location, match))
         }
     }
 

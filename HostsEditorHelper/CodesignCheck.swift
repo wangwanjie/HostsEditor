@@ -12,6 +12,27 @@ struct CodesignCheck {
         try codeSigningCertificatesForSelf() == codeSigningCertificates(forPID: pid)
     }
 
+    /// 根据 Helper 自身的 Team ID 生成客户端签名要求。
+    /// 未使用 Team 签名（如 Sign to Run Locally）时返回 nil，此时只保留证书比对校验。
+    static func clientRequirement(forBundleIdentifier bundleIdentifier: String) -> String? {
+        guard let teamIdentifier = try? teamIdentifierForSelf(), !teamIdentifier.isEmpty else {
+            return nil
+        }
+        return "identifier \"\(bundleIdentifier)\" and anchor apple generic and certificate leaf[subject.OU] = \"\(teamIdentifier)\""
+    }
+
+    private static func teamIdentifierForSelf() throws -> String? {
+        guard let staticCode = try secStaticCodeForSelf() else { return nil }
+        var info: CFDictionary?
+        try executeSecurityCall {
+            SecCodeCopySigningInformation(staticCode, SecCSFlags(rawValue: kSecCSSigningInformation), &info)
+        }
+        guard let signingInfo = info as? [String: Any] else {
+            return nil
+        }
+        return signingInfo[kSecCodeInfoTeamIdentifier as String] as? String
+    }
+
     private static func codeSigningCertificatesForSelf() throws -> [SecCertificate] {
         guard let staticCode = try secStaticCodeForSelf() else { return [] }
         return try codeSigningCertificates(forStaticCode: staticCode)

@@ -8,8 +8,6 @@
 "menu.show_all" = "顯示全部";
 "menu.quit_app" = "結束 HostsEditor";
 "menu.file" = "檔案";
-"menu.new" = "新增";
-"menu.open" = "打開…";
 "menu.close" = "關閉";
 "menu.edit" = "編輯";
 "menu.undo" = "復原";
@@ -154,3 +152,27 @@
 "accessibility.previous_result" = "上一個結果";
 "accessibility.next_result" = "下一個結果";
 "accessibility.close_find" = "關閉搜尋";
+
+"menu.new_local_profile" = "新增本機方案";
+"menu.new_remote_profile" = "新增遠端方案…";
+"menu.import" = "匯入 hosts 檔案…";
+"menu.save_and_apply" = "儲存並套用";
+"menu.export" = "匯出目前內容…";
+"menu.show_backups" = "在 Finder 中顯示 hosts 備份";
+"main.context.duplicate" = "複製方案";
+"main.import.message" = "選擇要匯入為本機方案的 hosts 檔案";
+"main.import.prompt" = "匯入";
+"main.import.failed" = "匯入 %@ 失敗: %@";
+"main.export.failed" = "匯出失敗: %@";
+"main.unsaved.title" = "有尚未儲存的修改";
+"main.unsaved.message" = "部分編輯內容尚未儲存並套用，現在結束將捨棄這些修改。";
+"main.unsaved.discard_and_quit" = "捨棄修改並結束";
+"hosts.duplicate_name" = "%@ 副本";
+"hosts.error.unsupported_scheme" = "僅支援 http 與 https 網址";
+"hosts.error.http_status" = "伺服器回應了 HTTP %ld";
+"hosts.error.html_response" = "該網址回傳的是網頁，並不是 hosts 檔案";
+"preferences.remote_refresh" = "遠端方案更新";
+"settings.remote_refresh.off" = "不自動更新";
+"settings.remote_refresh.hourly" = "每小時";
+"settings.remote_refresh.six_hours" = "每 6 小時";
+"settings.remote_refresh.daily" = "每天";

@@ -73,16 +73,132 @@ extension ViewController {
             manager.setErrorMessage(L10n.mainRemoteURLEmpty)
             return
         }
+        // 先在本地校验地址格式，避免无效地址也关闭输入框
+        do {
+            _ = try HostsManager.validatedRemoteURL(from: url)
+        } catch {
+            manager.setErrorMessage(error.localizedDescription)
+            return
+        }
         addRemotePopover?.close()
         addRemotePopover = nil
-        Task {
-            await manager.addRemoteProfile(urlString: url)
-            if let profile = manager.profiles.first(where: { $0.remoteURL == url }) {
-                let row = row(for: .profile(profile.id))
-                profileTableView.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
-                selection = .profile(profile.id)
+        Task { @MainActor [weak self] in
+            guard let self else {
+                return
+            }
+            // 直接使用返回的方案 id 定位，避免同一 URL 存在多个方案时选错
+            guard let profileId = await manager.addRemoteProfile(urlString: url) else {
+                return
+            }
+            selectProfile(id: profileId)
+        }
+    }
+
+    /// 选中指定方案并同步编辑器
+    func selectProfile(id: String) {
+        let targetRow = row(for: .profile(id))
+        profileTableView.selectRowIndexes(IndexSet(integer: targetRow), byExtendingSelection: false)
+        selection = .profile(id)
+    }
+
+    @objc func newLocalProfileFromMenu(_ sender: Any?) {
+        addLocalProfile()
+    }
+
+    @objc func newRemoteProfileFromMenu(_ sender: Any?) {
+        showAddRemotePopover()
+    }
+
+    @objc func saveAndApplyFromMenu(_ sender: Any?) {
+        guard applyButton.isEnabled else {
+            NSSound.beep()
+            return
+        }
+        saveAndApply()
+    }
+
+    /// 从本地文件导入为新的本地方案
+    @objc func importProfileFromFile(_ sender: Any?) {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = true
+        panel.message = L10n.tr("main.import.message")
+        panel.prompt = L10n.tr("main.import.prompt")
+
+        guard let window = view.window else {
+            return
+        }
+        panel.beginSheetModal(for: window) { [weak self] response in
+            guard let self, response == .OK else {
+                return
+            }
+            var lastImportedId: String?
+            for url in panel.urls {
+                do {
+                    lastImportedId = try self.manager.importProfile(fromFileURL: url).id
+                } catch {
+                    self.manager.setErrorMessage(L10n.tr("main.import.failed", url.lastPathComponent, error.localizedDescription))
+                }
+            }
+            if let lastImportedId {
+                self.selectProfile(id: lastImportedId)
             }
         }
+    }
+
+    /// 将编辑器当前内容导出为文本文件
+    @objc func exportCurrentContent(_ sender: Any?) {
+        guard let window = view.window else {
+            return
+        }
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = suggestedExportFileName()
+        panel.canCreateDirectories = true
+        let content = editorTextView.string
+        panel.beginSheetModal(for: window) { [weak self] response in
+            guard response == .OK, let url = panel.url else {
+                return
+            }
+            do {
+                try Data(content.utf8).write(to: url, options: .atomic)
+            } catch {
+                self?.manager.setErrorMessage(L10n.tr("main.export.failed", error.localizedDescription))
+            }
+        }
+    }
+
+    func suggestedExportFileName() -> String {
+        let baseName: String
+        switch selection {
+        case .system:
+            baseName = "hosts"
+        case .base:
+            baseName = "hosts-base"
+        case .profile(let id):
+            baseName = manager.profile(for: id)?.name ?? "hosts"
+        }
+        // 文件名中去掉路径分隔符，避免保存面板误判为子目录
+        let sanitized = baseName.replacingOccurrences(of: "/", with: "-").replacingOccurrences(of: ":", with: "-")
+        return sanitized.isEmpty ? "hosts.txt" : "\(sanitized).txt"
+    }
+
+    /// 在 Finder 中打开 hosts 备份目录
+    @objc func showBackupsInFinder(_ sender: Any?) {
+        guard let directory = manager.backupDirectoryURL else {
+            NSSound.beep()
+            return
+        }
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        NSWorkspace.shared.activateFileViewerSelecting([directory])
+    }
+
+    @objc func duplicateProfileFromContextMenu(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? String,
+              let copy = manager.duplicateProfile(id: id) else {
+            return
+        }
+        selectProfile(id: copy.id)
     }
 
     func performRemoveProfile() {
@@ -119,17 +235,10 @@ extension ViewController {
     }
 
     @objc func refreshRemoteFromContextMenu(_ sender: NSMenuItem) {
-        guard let id = sender.representedObject as? String else { return }
-        Task { [weak self] in
-            guard let self else { return }
-            await manager.refreshRemoteProfile(id: id)
-            await MainActor.run {
-                self.pendingEdits.removeValue(forKey: id)
-                if case .profile(let currentId) = self.selection, currentId == id {
-                    self.syncEditorFromSelection()
-                }
-            }
+        guard let id = sender.representedObject as? String else {
+            return
         }
+        refreshRemoteProfile(id: id)
     }
 
     @objc func removeProfileFromContextMenu(_ sender: NSMenuItem) {
@@ -176,12 +285,19 @@ extension ViewController {
             manager.setErrorMessage(L10n.tr("main.remote_profile_required"))
             return
         }
-        Task { [weak self] in
-            guard let self else { return }
+        refreshRemoteProfile(id: id)
+    }
+
+    /// 刷新远程方案，完成后若仍选中该方案则同步编辑器内容
+    func refreshRemoteProfile(id: String) {
+        Task { @MainActor [weak self] in
+            guard let self else {
+                return
+            }
             await manager.refreshRemoteProfile(id: id)
-            await MainActor.run {
-                self.pendingEdits.removeValue(forKey: id)
-                self.syncEditorFromSelection()
+            pendingEdits.removeValue(forKey: id)
+            if case .profile(let currentId) = selection, currentId == id {
+                syncEditorFromSelection()
             }
         }
     }

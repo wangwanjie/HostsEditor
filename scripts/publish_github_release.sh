@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 #
-# 将 DMG 上传到 GitHub Releases。
-# 默认上传 build/dmg/ 下最新的 HostsEditor_V_*.dmg，
+# 将 DMG 上传到 GitHub Releases，并同步 Sparkle appcast。
+# 默认上传 build/dmg/ 下当前版本的各架构 DMG（HostsEditor_V_<版本号>_arm64.dmg / _x86_64.dmg），
+# 并分别更新 appcast-arm64.xml、appcast-x86_64.xml 以及兼容旧通用版的 appcast.xml。
 # 默认优先从 git remote origin_github 推断 GitHub 仓库，再回退到其他 github.com remote。
 #
 # 用法:
-#   ./scripts/publish_github_release.sh [--dmg PATH] [--repo OWNER/REPO] [--tag TAG]
+#   ./scripts/publish_github_release.sh [--dmg PATH]... [--repo OWNER/REPO] [--tag TAG]
 #                                       [--title TITLE] [--notes TEXT | --notes-file FILE | --generate-notes]
 #                                       [--draft] [--prerelease]
 #
@@ -18,6 +19,7 @@ DEFAULT_DMG_DIR="$PROJECT_DIR/build/dmg"
 PBXPROJ="$PROJECT_DIR/HostsEditor.xcodeproj/project.pbxproj"
 INFO_PLIST="$PROJECT_DIR/HostsEditor/Info.plist"
 
+DMG_PATHS=()
 DMG_PATH=""
 REPO=""
 TAG=""
@@ -32,12 +34,12 @@ GITHUB_API_BASE="https://api.github.com"
 usage() {
     cat <<'EOF'
 用法:
-  ./scripts/publish_github_release.sh [--dmg PATH] [--repo OWNER/REPO] [--tag TAG]
+  ./scripts/publish_github_release.sh [--dmg PATH]... [--repo OWNER/REPO] [--tag TAG]
                                      [--title TITLE] [--notes TEXT | --notes-file FILE | --generate-notes]
                                      [--draft] [--prerelease]
 
 选项:
-  --dmg PATH          指定要上传的 DMG 路径。默认选择 build/dmg/ 下最新的 HostsEditor_V_*.dmg
+  --dmg PATH          指定要上传的 DMG 路径，可重复传入。默认选择 build/dmg/ 下当前版本的各架构 DMG
   --repo OWNER/REPO   指定 GitHub 仓库，例如 wangwanjie/HostsEditor
   --tag TAG           指定 release tag，默认根据版本号生成，例如 v1.0
   --title TITLE       指定 release 标题，默认格式为 HostsEditor v<版本号>
@@ -170,16 +172,43 @@ find_latest_dmg() {
     printf '%s\n' "$latest_path"
 }
 
+# 当前版本的各架构 DMG
+find_version_dmgs() {
+    local version="$1"
+    local arch
+
+    for arch in arm64 x86_64; do
+        if [[ -f "$DEFAULT_DMG_DIR/HostsEditor_V_${version}_${arch}.dmg" ]]; then
+            printf '%s\n' "$DEFAULT_DMG_DIR/HostsEditor_V_${version}_${arch}.dmg"
+        fi
+    done
+}
+
+# 形如 HostsEditor_V_1.8.0_arm64.dmg 或旧通用包 HostsEditor_V_1.7.2.dmg
 infer_version_from_dmg() {
     local dmg_name
+    local raw
     dmg_name="$(basename "$1")"
 
     if [[ "$dmg_name" =~ ^HostsEditor_V_(.+)\.dmg$ ]]; then
-        printf '%s\n' "${BASH_REMATCH[1]}"
+        raw="${BASH_REMATCH[1]}"
+        raw="${raw%_arm64}"
+        raw="${raw%_x86_64}"
+        printf '%s\n' "$raw"
         return 0
     fi
 
     return 1
+}
+
+# 从文件名取架构，旧通用包返回空
+infer_arch_from_dmg() {
+    local dmg_name
+    dmg_name="$(basename "$1")"
+
+    if [[ "$dmg_name" =~ _(arm64|x86_64)\.dmg$ ]]; then
+        printf '%s\n' "${BASH_REMATCH[1]}"
+    fi
 }
 
 read_marketing_version() {
@@ -391,7 +420,7 @@ while [[ $# -gt 0 ]]; do
                 echo "错误: --dmg 需要指定路径" >&2
                 exit 1
             fi
-            DMG_PATH="$2"
+            DMG_PATHS+=("$2")
             shift 2
             ;;
         --repo)
@@ -476,16 +505,33 @@ else
     HAS_GH=true
 fi
 
-if [[ -n "$DMG_PATH" ]]; then
-    DMG_PATH="$(resolve_path "$DMG_PATH")"
+if [[ ${#DMG_PATHS[@]} -gt 0 ]]; then
+    resolved_paths=()
+    for dmg in "${DMG_PATHS[@]}"; do
+        resolved="$(resolve_path "$dmg")"
+        if [[ -z "$resolved" || ! -f "$resolved" ]]; then
+            echo "错误: 未找到 DMG $dmg" >&2
+            exit 1
+        fi
+        resolved_paths+=("$resolved")
+    done
+    DMG_PATHS=("${resolved_paths[@]}")
 else
-    DMG_PATH="$(find_latest_dmg)"
+    while IFS= read -r dmg; do
+        [[ -n "$dmg" ]] && DMG_PATHS+=("$dmg")
+    done < <(find_version_dmgs "$(read_marketing_version)")
+    # 没有按架构的产物时退回旧行为：取最新的单个 DMG
+    if [[ ${#DMG_PATHS[@]} -eq 0 ]]; then
+        latest="$(find_latest_dmg)"
+        [[ -n "$latest" ]] && DMG_PATHS=("$latest")
+    fi
 fi
 
-if [[ -z "$DMG_PATH" || ! -f "$DMG_PATH" ]]; then
+if [[ ${#DMG_PATHS[@]} -eq 0 ]]; then
     echo "错误: 未找到可上传的 DMG，请先执行 ./scripts/build_dmg.sh 或通过 --dmg 指定文件" >&2
     exit 1
 fi
+DMG_PATH="${DMG_PATHS[0]}"
 
 if [[ -n "$NOTES_FILE" ]]; then
     NOTES_FILE="$(resolve_path "$NOTES_FILE")"
@@ -511,6 +557,14 @@ if [[ -z "$VERSION" ]]; then
     exit 1
 fi
 
+# 一次只发布同一版本的 DMG
+for dmg in "${DMG_PATHS[@]}"; do
+    if [[ "$(infer_version_from_dmg "$dmg" || true)" != "$VERSION" ]]; then
+        echo "错误: $dmg 与版本 $VERSION 不一致" >&2
+        exit 1
+    fi
+done
+
 if [[ -z "$TAG" ]]; then
     TAG="v$VERSION"
 fi
@@ -522,15 +576,15 @@ fi
 echo "仓库: $REPO"
 echo "Tag: $TAG"
 echo "标题: $TITLE"
-echo "DMG: $DMG_PATH"
+printf 'DMG: %s\n' "${DMG_PATHS[@]}"
 
 if [[ "$HAS_GH" == true ]]; then
     if gh release view "$TAG" -R "$REPO" >/dev/null 2>&1; then
         echo "Release 已存在，上传并覆盖同名资源..."
-        gh release upload "$TAG" "$DMG_PATH" -R "$REPO" --clobber
+        gh release upload "$TAG" "${DMG_PATHS[@]}" -R "$REPO" --clobber
     else
         echo "Release 不存在，正在创建..."
-        create_args=(release create "$TAG" "$DMG_PATH" -R "$REPO" --title "$TITLE")
+        create_args=(release create "$TAG" "${DMG_PATHS[@]}" -R "$REPO" --title "$TITLE")
 
         if [[ "$GENERATE_NOTES" == true ]]; then
             create_args+=(--generate-notes)
@@ -556,14 +610,22 @@ if [[ "$HAS_GH" == true ]]; then
     APPCAST_NOTES="$(gh release view "$TAG" -R "$REPO" --json body --jq '.body // ""' 2>/dev/null || true)"
 else
     echo "未检测到可用的 GitHub CLI，改用 GitHub API 发布..."
-    publish_with_github_api
-fi
-APPCAST_ARGS=(--repo "$REPO" --archive "$DMG_PATH")
-if [[ -n "$APPCAST_NOTES" ]]; then
-    APPCAST_ARGS+=(--notes "$APPCAST_NOTES")
+    for DMG_PATH in "${DMG_PATHS[@]}"; do
+        publish_with_github_api
+    done
 fi
 
-"$PROJECT_DIR/scripts/generate_appcast.sh" "${APPCAST_ARGS[@]}"
+# 每个 DMG 更新所属架构的 appcast；按架构生成时 generate_appcast.sh 会同步重建 appcast.xml
+for dmg in "${DMG_PATHS[@]}"; do
+    APPCAST_ARGS=(--repo "$REPO" --archive "$dmg")
+    arch="$(infer_arch_from_dmg "$dmg")"
+    if [[ -n "$arch" ]]; then
+        APPCAST_ARGS+=(--arch "$arch")
+    fi
+    if [[ -n "$APPCAST_NOTES" ]]; then
+        APPCAST_ARGS+=(--notes "$APPCAST_NOTES")
+    fi
+    "$PROJECT_DIR/scripts/generate_appcast.sh" "${APPCAST_ARGS[@]}"
+done
 
-echo "appcast 已更新: $PROJECT_DIR/appcast.xml"
-echo "请将 appcast.xml 一并提交并推送到 GitHub 默认分支。"
+echo "appcast 已更新（appcast.xml / appcast-<arch>.xml），请提交并推送到 GitHub 默认分支。"

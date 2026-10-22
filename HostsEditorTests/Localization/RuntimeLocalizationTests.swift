@@ -16,7 +16,7 @@ struct RuntimeLocalizationTests {
         AppLocalization.shared.setLanguage(.simplifiedChinese)
 
         let controller = ViewController()
-        controller.loadViewIfNeeded()
+        _ = controller.view
 
         #expect(controller.debugApplyButtonTitle == "保存并应用")
         #expect(controller.debugAddProfileButtonTitle == "新建")

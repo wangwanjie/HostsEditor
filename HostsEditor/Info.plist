@@ -21,7 +21,7 @@
 	<key>SUEnableSystemProfiling</key>
 	<true/>
 	<key>SUFeedURL</key>
-	<string>https://raw.githubusercontent.com/wangwanjie/HostsEditor/main/appcast.xml</string>
+	<string>https://raw.githubusercontent.com/wangwanjie/HostsEditor/main/$(HOSTSEDITOR_APPCAST_NAME)</string>
 	<key>SUPublicEDKey</key>
 	<string>BzzVMvOjFJ40+dn0w5cLJcLHIHct+6OpLIoXawVAN28=</string>
 	<key>SUVerifyUpdateBeforeExtraction</key>

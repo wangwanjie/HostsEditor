@@ -8,6 +8,7 @@ nonisolated enum AppSettingKey: String, Codable, CaseIterable {
     case updateCheckStrategy = "update_check_strategy"
     case editorFontSize = "editor_font_size"
     case sidebarWidth = "sidebar_width"
+    case remoteRefreshInterval = "remote_refresh_interval"
 
     var legacyUserDefaultsKey: String {
         switch self {
@@ -23,6 +24,9 @@ nonisolated enum AppSettingKey: String, Codable, CaseIterable {
             return "HostsEditorEditorFontSize"
         case .sidebarWidth:
             return "HostsEditorSidebarWidth"
+        case .remoteRefreshInterval:
+            // 该设置在数据库迁移之后才引入，旧版本 UserDefaults 中不会存在此键
+            return "HostsEditorRemoteRefreshInterval"
         }
     }
 }

@@ -4,6 +4,10 @@ import GRDB
 final class AppDatabase {
     static let shared: AppDatabase = {
         do {
+            // 单元测试 / UI 测试使用内存数据库，避免测试读写用户真实的方案数据
+            if AppEnvironment.isRunningTests {
+                return try AppDatabase.inMemory()
+            }
             return try AppDatabase(configuration: AppDatabaseConfiguration(databasePath: defaultDatabasePath()))
         } catch {
             fatalError("Failed to initialize AppDatabase.shared: \(error)")

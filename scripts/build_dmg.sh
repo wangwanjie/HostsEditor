@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 #
-# 打包 HostsEditor 为 DMG：构建 Release，生成 HostsEditor_V_<版本号>.dmg，可选公证。
+# 按架构分别打包 HostsEditor：每个架构单独归档 Release，生成 HostsEditor_V_<版本号>_<arch>.dmg，可选公证。
+# 各架构包的 SUFeedURL 指向对应的 appcast-<arch>.xml，只会收到同架构的更新。
+#
 # 用法:
-#   ./scripts/build_dmg.sh [--keychain-profile PROFILE] [--no-notarize]
+#   ./scripts/build_dmg.sh [--arch arm64|x86_64]... [--keychain-profile PROFILE] [--no-notarize] [--skip-archive]
+# 默认同时构建 arm64 与 x86_64；--arch 可重复传入，只构建指定架构。
 # 默认使用 --keychain-profile "vanjay_mac_stapler" 进行公证；传入 --no-notarize 则跳过公证。
+# --skip-archive 复用 build/HostsEditor-<arch>.xcarchive，只重新签名、打包和公证。
 #
 
 set -euo pipefail
@@ -15,10 +19,12 @@ WORKSPACE="HostsEditor.xcworkspace"
 CONFIGURATION="Release"
 BUILD_DIR="$PROJECT_DIR/build"
 DERIVED_DATA="$BUILD_DIR/DerivedData"
-ARCHIVE_PATH="$BUILD_DIR/HostsEditor.xcarchive"
 DMG_OUTPUT_DIR="$BUILD_DIR/dmg"
 KEYCHAIN_PROFILE="vanjay_mac_stapler"
 DO_NOTARIZE=true
+DO_ARCHIVE=true
+ARCHS_TO_BUILD=()
+SUPPORTED_ARCHS=(arm64 x86_64)
 APP_ENTITLEMENTS="$PROJECT_DIR/HostsEditor/HostsEditor-Release.entitlements"
 HELPER_ENTITLEMENTS="$PROJECT_DIR/HostsEditorHelper/HostsEditorHelper-Release.entitlements"
 
@@ -54,7 +60,7 @@ class BackgroundView: NSView {
         static let titleFont = NSFont(name: "Avenir Next Demi Bold", size: 26) ?? .systemFont(ofSize: 26, weight: .semibold)
         static let subtitleFont = NSFont(name: "Avenir Next Regular", size: 14) ?? .systemFont(ofSize: 14)
         static let titleText = "Drag HostsEditor to Applications"
-        static let subtitleText = "Install the native macOS inspector by dragging it onto the Applications shortcut"
+        static let subtitleText = "Install the hosts profile switcher by dragging it onto the Applications shortcut"
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -175,7 +181,9 @@ resign_macho_file() {
 
 resign_for_notarization() {
     local identity="$1"
-    local frameworks_dir="$APP_PATH/Contents/Frameworks"
+    local app_path="$2"
+    local helper_path="$app_path/Contents/MacOS/HostsEditorHelper"
+    local frameworks_dir="$app_path/Contents/Frameworks"
 
     echo "重新签名发布产物并补充 secure timestamp..."
 
@@ -190,15 +198,18 @@ resign_for_notarization() {
     if [[ -f "$HELPER_ENTITLEMENTS" ]]; then
         /usr/bin/codesign --force --sign "$identity" --timestamp --options runtime \
             --entitlements "$HELPER_ENTITLEMENTS" \
-            "$HELPER_PATH"
+            "$helper_path"
     else
         /usr/bin/codesign --force --sign "$identity" --timestamp --options runtime \
-            "$HELPER_PATH"
+            "$helper_path"
     fi
 
     /usr/bin/codesign --force --sign "$identity" --timestamp --options runtime \
         --entitlements "$APP_ENTITLEMENTS" \
-        "$APP_PATH"
+        "$app_path"
+
+    # 整体严格校验一遍，提前发现嵌套代码签名问题，避免等到公证阶段才失败
+    /usr/bin/codesign --verify --deep --strict --verbose=2 "$app_path"
 }
 
 create_pretty_dmg() {
@@ -286,6 +297,14 @@ EOF
 # 解析参数
 while [[ $# -gt 0 ]]; do
     case $1 in
+        --arch)
+            if [[ -z "${2:-}" || "$2" == --* ]]; then
+                echo "错误: --arch 需要指定 arm64 或 x86_64" >&2
+                exit 1
+            fi
+            ARCHS_TO_BUILD+=("$2")
+            shift 2
+            ;;
         --keychain-profile)
             if [[ -z "${2:-}" || "$2" == --* ]]; then
                 echo "错误: --keychain-profile 需要指定 profile 名称" >&2
@@ -298,10 +317,16 @@ while [[ $# -gt 0 ]]; do
             DO_NOTARIZE=false
             shift
             ;;
+        --skip-archive)
+            DO_ARCHIVE=false
+            shift
+            ;;
         -h|--help)
-            echo "用法: $0 [--keychain-profile PROFILE] [--no-notarize]"
+            echo "用法: $0 [--arch arm64|x86_64]... [--keychain-profile PROFILE] [--no-notarize] [--skip-archive]"
+            echo "  默认同时构建 arm64 与 x86_64"
             echo "  默认公证使用: --keychain-profile \"vanjay_mac_stapler\""
             echo "  --no-notarize  跳过公证"
+            echo "  --skip-archive 复用已有归档，只重新签名与打包"
             exit 0
             ;;
         *)
@@ -311,10 +336,21 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+if [[ ${#ARCHS_TO_BUILD[@]} -eq 0 ]]; then
+    ARCHS_TO_BUILD=("${SUPPORTED_ARCHS[@]}")
+fi
+for arch in "${ARCHS_TO_BUILD[@]}"; do
+    if [[ " ${SUPPORTED_ARCHS[*]} " != *" $arch "* ]]; then
+        echo "错误: 不支持的架构 $arch（可选: ${SUPPORTED_ARCHS[*]}）" >&2
+        exit 1
+    fi
+done
+
 cd "$PROJECT_DIR"
 
 # 从工程文件读取版本号（不依赖 xcodebuild -showBuildSettings）
 echo "读取版本号..."
+VERSION=""
 PBXPROJ="$PROJECT_DIR/HostsEditor.xcodeproj/project.pbxproj"
 if [[ -f "$PBXPROJ" ]]; then
     VERSION=$(grep -m1 "MARKETING_VERSION" "$PBXPROJ" | sed 's/.*MARKETING_VERSION = \([^;]*\);/\1/' | tr -d ' ')
@@ -323,75 +359,118 @@ if [[ -z "$VERSION" ]]; then
     echo "错误: 无法从 project.pbxproj 读取 MARKETING_VERSION" >&2
     exit 1
 fi
-echo "版本号: $VERSION"
+echo "版本号: $VERSION，架构: ${ARCHS_TO_BUILD[*]}"
 
-DMG_NAME="HostsEditor_V_${VERSION}.dmg"
-APP_PATH="$ARCHIVE_PATH/Products/Applications/HostsEditor.app"
+# 第一个架构确定签名身份，后续架构复用，保证各包签名一致
+SIGNING_AUTHORITY=""
+BUILT_DMGS=()
 
-# 使用 archive，避免 scheme 的 BuildAction 在多 target 场景下误构建 Debug runnable target。
-# 归档（arm64 + x86_64，Release 需使用 Developer ID Application 签名）
-echo "归档 $SCHEME (Release, arm64 + x86_64)..."
-xcodebuild -workspace "$WORKSPACE" \
-    -scheme "$SCHEME" \
-    -configuration "$CONFIGURATION" \
-    -derivedDataPath "$DERIVED_DATA" \
-    -archivePath "$ARCHIVE_PATH" \
-    -destination "generic/platform=macOS" \
-    ARCHS="arm64 x86_64" \
-    ONLY_ACTIVE_ARCH=NO \
-    clean archive
+notarize_dmg() {
+    local dmg_path="$1"
+    local notary_output
+    local notary_id
 
-if [[ ! -d "$APP_PATH" ]]; then
-    echo "错误: 未找到构建产物 $APP_PATH" >&2
-    exit 1
-fi
-
-HELPER_PATH="$APP_PATH/Contents/MacOS/HostsEditorHelper"
-SIGNING_AUTHORITY="$(current_signing_authority "$APP_PATH")"
-if [[ -z "$SIGNING_AUTHORITY" ]]; then
-    echo "错误: 未能从构建产物识别 Developer ID Application 签名身份" >&2
-    exit 1
-fi
-
-resign_for_notarization "$SIGNING_AUTHORITY"
-verify_signature "$APP_PATH" "HostsEditor.app"
-verify_signature "$HELPER_PATH" "HostsEditorHelper"
-
-# 准备 DMG 输出目录
-mkdir -p "$DMG_OUTPUT_DIR"
-DMG_PATH="$DMG_OUTPUT_DIR/$DMG_NAME"
-VOLUME_NAME="HostsEditor V$VERSION"
-
-# 若已存在同名 DMG 先删除，避免 hdiutil 报错
-rm -f "$DMG_PATH"
-
-# 创建 DMG（包含 Applications 快捷方式和预设窗口布局）
-echo "生成 DMG: $DMG_PATH"
-create_pretty_dmg "$APP_PATH" "$DMG_PATH" "$VOLUME_NAME"
-
-echo "DMG 已生成: $DMG_PATH"
-
-# 公证（可选）
-if [[ "$DO_NOTARIZE" == true ]]; then
     echo "提交公证 (keychain-profile: $KEYCHAIN_PROFILE)..."
-    NOTARY_OUTPUT=$(xcrun notarytool submit "$DMG_PATH" \
+    notary_output=$(xcrun notarytool submit "$dmg_path" \
         --keychain-profile "$KEYCHAIN_PROFILE" \
         --wait 2>&1) || true
-    echo "$NOTARY_OUTPUT"
-    if echo "$NOTARY_OUTPUT" | grep -q "status: Accepted"; then
+    echo "$notary_output"
+    if echo "$notary_output" | grep -q "status: Accepted"; then
         echo "公证成功，正在钉合 (staple)..."
-        xcrun stapler staple "$DMG_PATH"
+        xcrun stapler staple "$dmg_path"
         echo "公证并钉合完成。"
     else
         echo "公证未通过 (status 非 Accepted)。" >&2
-        if echo "$NOTARY_OUTPUT" | grep -q "id:"; then
-            NOTARY_ID=$(echo "$NOTARY_OUTPUT" | sed -n 's/.*id:[[:space:]]*\([^[:space:]]*\).*/\1/p' | head -1)
-            [[ -n "$NOTARY_ID" ]] && echo "查看失败原因: xcrun notarytool log $NOTARY_ID --keychain-profile \"$KEYCHAIN_PROFILE\"" >&2
+        notary_id=$(echo "$notary_output" | sed -n 's/.*id:[[:space:]]*\([^[:space:]]*\).*/\1/p' | head -1)
+        if [[ -n "$notary_id" ]]; then
+            echo "查看失败原因: xcrun notarytool log $notary_id --keychain-profile \"$KEYCHAIN_PROFILE\"" >&2
         fi
         exit 1
     fi
-else
-    echo "已跳过公证 (--no-notarize)。"
-fi
+}
 
-echo "完成。产物: $DMG_PATH"
+build_arch() {
+    local arch="$1"
+    local archive_path="$BUILD_DIR/HostsEditor-$arch.xcarchive"
+    local app_path="$archive_path/Products/Applications/HostsEditor.app"
+    local helper_path="$app_path/Contents/MacOS/HostsEditorHelper"
+    local binary_archs
+    local helper_archs
+    local feed_url
+
+    echo "========== $arch =========="
+    if [[ "$DO_ARCHIVE" == true ]]; then
+        # 使用 archive，避免 scheme 的 BuildAction 在多 target 场景下误构建 Debug runnable target。
+        # HOSTSEDITOR_APPCAST_NAME 决定 Info.plist 中的 SUFeedURL，让各架构只收到同架构的更新。
+        echo "归档 $SCHEME (Release, $arch)..."
+        rm -rf "$archive_path"
+        xcodebuild -workspace "$WORKSPACE" \
+            -scheme "$SCHEME" \
+            -configuration "$CONFIGURATION" \
+            -derivedDataPath "$DERIVED_DATA" \
+            -archivePath "$archive_path" \
+            -destination "generic/platform=macOS" \
+            ARCHS="$arch" \
+            ONLY_ACTIVE_ARCH=NO \
+            HOSTSEDITOR_APPCAST_NAME="appcast-$arch.xml" \
+            clean archive
+    fi
+
+    if [[ ! -d "$app_path" ]]; then
+        echo "错误: 未找到构建产物 $app_path" >&2
+        exit 1
+    fi
+
+    # 确认主程序与 Helper 都只包含目标架构，且 feed 地址正确
+    binary_archs="$(lipo -archs "$app_path/Contents/MacOS/HostsEditor")"
+    helper_archs="$(lipo -archs "$helper_path")"
+    if [[ "$binary_archs" != "$arch" || "$helper_archs" != "$arch" ]]; then
+        echo "错误: 主程序架构为 '$binary_archs'，Helper 架构为 '$helper_archs'，预期均为 '$arch'" >&2
+        exit 1
+    fi
+    feed_url="$(/usr/libexec/PlistBuddy -c 'Print :SUFeedURL' "$app_path/Contents/Info.plist")"
+    if [[ "$feed_url" != *"/appcast-$arch.xml" ]]; then
+        echo "错误: SUFeedURL 为 '$feed_url'，预期指向 appcast-$arch.xml" >&2
+        exit 1
+    fi
+    echo "SUFeedURL: $feed_url"
+
+    if [[ -z "$SIGNING_AUTHORITY" ]]; then
+        SIGNING_AUTHORITY="$(current_signing_authority "$app_path")"
+    fi
+    if [[ -z "$SIGNING_AUTHORITY" ]]; then
+        echo "错误: 未能从构建产物识别 Developer ID Application 签名身份" >&2
+        exit 1
+    fi
+
+    resign_for_notarization "$SIGNING_AUTHORITY" "$app_path"
+    verify_signature "$app_path" "HostsEditor.app ($arch)"
+    verify_signature "$helper_path" "HostsEditorHelper ($arch)"
+
+    mkdir -p "$DMG_OUTPUT_DIR"
+    local dmg_path="$DMG_OUTPUT_DIR/HostsEditor_V_${VERSION}_${arch}.dmg"
+    local volume_name="HostsEditor V$VERSION"
+
+    # 若已存在同名 DMG 先删除，避免 hdiutil 报错
+    rm -f "$dmg_path"
+
+    # 创建 DMG（包含 Applications 快捷方式和预设窗口布局）
+    echo "生成 DMG: $dmg_path"
+    create_pretty_dmg "$app_path" "$dmg_path" "$volume_name"
+    echo "DMG 已生成: $dmg_path"
+
+    if [[ "$DO_NOTARIZE" == true ]]; then
+        notarize_dmg "$dmg_path"
+    else
+        echo "已跳过公证 (--no-notarize)。"
+    fi
+
+    BUILT_DMGS+=("$dmg_path")
+}
+
+for arch in "${ARCHS_TO_BUILD[@]}"; do
+    build_arch "$arch"
+done
+
+echo "完成。产物:"
+printf '  %s\n' "${BUILT_DMGS[@]}"

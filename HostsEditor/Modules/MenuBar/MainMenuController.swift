@@ -86,8 +86,23 @@ final class MainMenuController: NSObject {
 
     private func makeFileMenuItem() -> NSMenuItem {
         let fileMenu = NSMenu(title: L10n.tr("menu.file"))
-        fileMenu.addItem(NSMenuItem(title: L10n.tr("menu.new"), action: nil, keyEquivalent: "n"))
-        fileMenu.addItem(NSMenuItem(title: L10n.tr("menu.open"), action: nil, keyEquivalent: "o"))
+        // 以下动作 target 为 nil，经响应链交给主界面 ViewController 处理
+        fileMenu.addItem(NSMenuItem(title: L10n.tr("menu.new_local_profile"), action: #selector(ViewController.newLocalProfileFromMenu(_:)), keyEquivalent: "n"))
+
+        let newRemoteItem = NSMenuItem(title: L10n.tr("menu.new_remote_profile"), action: #selector(ViewController.newRemoteProfileFromMenu(_:)), keyEquivalent: "n")
+        newRemoteItem.keyEquivalentModifierMask = [.command, .shift]
+        fileMenu.addItem(newRemoteItem)
+
+        fileMenu.addItem(NSMenuItem(title: L10n.tr("menu.import"), action: #selector(ViewController.importProfileFromFile(_:)), keyEquivalent: "o"))
+        fileMenu.addItem(NSMenuItem.separator())
+        fileMenu.addItem(NSMenuItem(title: L10n.tr("menu.save_and_apply"), action: #selector(ViewController.saveAndApplyFromMenu(_:)), keyEquivalent: "s"))
+
+        let exportItem = NSMenuItem(title: L10n.tr("menu.export"), action: #selector(ViewController.exportCurrentContent(_:)), keyEquivalent: "s")
+        exportItem.keyEquivalentModifierMask = [.command, .shift]
+        fileMenu.addItem(exportItem)
+
+        fileMenu.addItem(NSMenuItem.separator())
+        fileMenu.addItem(NSMenuItem(title: L10n.tr("menu.show_backups"), action: #selector(ViewController.showBackupsInFinder(_:)), keyEquivalent: ""))
         fileMenu.addItem(NSMenuItem.separator())
         fileMenu.addItem(NSMenuItem(title: L10n.tr("menu.close"), action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w"))
 

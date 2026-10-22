@@ -145,7 +145,13 @@ final class ViewController: NSViewController {
         )
 
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard let self else { return event }
+            guard let self else {
+                return event
+            }
+            // 只处理主窗口内的删除键，避免在偏好设置等其他窗口按删除键时误删方案
+            guard event.window === self.view.window else {
+                return event
+            }
             if event.keyCode == 51, case .profile = self.selection {
                 if Self.isEditingTextInput(
                     responder: self.view.window?.firstResponder,

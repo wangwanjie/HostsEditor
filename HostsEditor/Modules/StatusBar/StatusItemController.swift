@@ -10,6 +10,7 @@ final class StatusItemController: NSObject {
     private let openPreferencesHandler: () -> Void
     private var statusMenu: NSMenu?
     private var profileMenuItems: [NSMenuItem] = []
+    private var profilesSeparatorItem: NSMenuItem?
     private var cancellables = Set<AnyCancellable>()
 
     init(
@@ -29,6 +30,10 @@ final class StatusItemController: NSObject {
 
     var debugMenuTitles: [String] {
         statusMenu?.items.map(\.title) ?? []
+    }
+
+    var debugMenuItems: [NSMenuItem] {
+        statusMenu?.items ?? []
     }
 
     private func configureStatusItem() {
@@ -60,13 +65,20 @@ final class StatusItemController: NSObject {
     private func rebuildMenu() {
         let menu = NSMenu()
         menu.delegate = self
-        menu.addItem(NSMenuItem(title: L10n.tr("status.open_main_window"), action: #selector(openMainWindow), keyEquivalent: ""))
+        // 显式指定 target，避免依赖响应链（菜单栏菜单弹出时主窗口可能不在响应链中）
+        let openMainWindowItem = NSMenuItem(title: L10n.tr("status.open_main_window"), action: #selector(openMainWindow), keyEquivalent: "")
+        openMainWindowItem.target = self
+        menu.addItem(openMainWindowItem)
         menu.addItem(NSMenuItem.separator())
 
         statusMenu = menu
         rebuildProfileMenuItems()
 
-        menu.addItem(NSMenuItem.separator())
+        // 方案列表与后续菜单之间的分隔线；无方案时由 rebuildProfileMenuItems 隐藏
+        let separatorItem = NSMenuItem.separator()
+        separatorItem.isHidden = profileMenuItems.isEmpty
+        menu.addItem(separatorItem)
+        profilesSeparatorItem = separatorItem
 
         let preferencesItem = NSMenuItem(title: L10n.menuPreferences, action: #selector(openPreferences), keyEquivalent: "")
         preferencesItem.target = self
@@ -102,6 +114,7 @@ final class StatusItemController: NSObject {
             profileMenuItems.append(item)
             insertIndex += 1
         }
+        profilesSeparatorItem?.isHidden = profileMenuItems.isEmpty
     }
 
     @objc private func openMainWindow() {

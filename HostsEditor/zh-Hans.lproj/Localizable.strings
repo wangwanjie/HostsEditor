@@ -8,8 +8,6 @@
 "menu.show_all" = "显示全部";
 "menu.quit_app" = "退出 HostsEditor";
 "menu.file" = "文件";
-"menu.new" = "新建";
-"menu.open" = "打开…";
 "menu.close" = "关闭";
 "menu.edit" = "编辑";
 "menu.undo" = "撤销";
@@ -154,3 +152,27 @@
 "accessibility.previous_result" = "上一个结果";
 "accessibility.next_result" = "下一个结果";
 "accessibility.close_find" = "关闭查找";
+
+"menu.new_local_profile" = "新建本地方案";
+"menu.new_remote_profile" = "新建远程方案…";
+"menu.import" = "导入 hosts 文件…";
+"menu.save_and_apply" = "保存并应用";
+"menu.export" = "导出当前内容…";
+"menu.show_backups" = "在访达中显示 hosts 备份";
+"main.context.duplicate" = "复制方案";
+"main.import.message" = "选择要导入为本地方案的 hosts 文件";
+"main.import.prompt" = "导入";
+"main.import.failed" = "导入 %@ 失败: %@";
+"main.export.failed" = "导出失败: %@";
+"main.unsaved.title" = "有尚未保存的修改";
+"main.unsaved.message" = "部分编辑内容还没有保存并应用，现在退出将丢弃这些修改。";
+"main.unsaved.discard_and_quit" = "放弃修改并退出";
+"hosts.duplicate_name" = "%@ 副本";
+"hosts.error.unsupported_scheme" = "仅支持 http 和 https 地址";
+"hosts.error.http_status" = "服务器返回了 HTTP %ld";
+"hosts.error.html_response" = "该地址返回的是网页，并不是 hosts 文件";
+"preferences.remote_refresh" = "远程方案刷新";
+"settings.remote_refresh.off" = "不自动刷新";
+"settings.remote_refresh.hourly" = "每小时";
+"settings.remote_refresh.six_hours" = "每 6 小时";
+"settings.remote_refresh.daily" = "每天";

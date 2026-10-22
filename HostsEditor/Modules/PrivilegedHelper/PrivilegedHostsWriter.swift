@@ -40,7 +40,8 @@ enum PrivilegedHostsError: Error, LocalizedError {
     }
 }
 
-private struct HelperLaunchdState {
+/// 解析 `launchctl print` 输出，用于判断 Helper 是否需要修复（internal 便于单元测试）
+struct HelperLaunchdState {
     let rawOutput: String
 
     var programIdentifier: String? {
@@ -55,12 +56,21 @@ private struct HelperLaunchdState {
         rawOutput.contains("job state = spawn failed") || rawOutput.contains("last exit code = 78: EX_CONFIG")
     }
 
+    /// 只有输出中确实存在 program identifier 且与预期不一致时才算路径不匹配；
+    /// 部分系统版本的输出不含该字段，不能因此反复要求修复
+    var hasProgramPathMismatch: Bool {
+        guard let programIdentifier else {
+            return false
+        }
+        return programIdentifier != helperProgramIdentifier
+    }
+
     var shouldForceRepair: Bool {
-        needsLWCRUpdate || programIdentifier != helperProgramIdentifier || isSpawnFailed
+        needsLWCRUpdate || hasProgramPathMismatch || isSpawnFailed
     }
 
     var recoveryMessage: String {
-        if let programIdentifier, programIdentifier != helperProgramIdentifier {
+        if hasProgramPathMismatch {
             return L10n.tr("helper.error.recovery_path_mismatch")
         }
 
@@ -81,7 +91,35 @@ private struct HelperLaunchdState {
     }
 }
 
-final class PrivilegedHostsWriter {
+/// 保证多个并发回调中只有第一个能“认领”结果
+private nonisolated final class ResumeOnceGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var claimed = false
+
+    func tryClaim() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !claimed else {
+            return false
+        }
+        claimed = true
+        return true
+    }
+}
+
+/// HostsManager 依赖的特权写入能力，便于在测试中替换为假实现
+protocol PrivilegedHostsWriting: AnyObject {
+    var daemonStatus: SMAppService.Status { get }
+    var isHelperInstalled: Bool { get }
+    var isHelperExplicitlyDisabled: Bool { get }
+    var hasRegisteredHelper: Bool { get }
+    func writeHosts(content: String) async throws
+    func enableHelper() async throws
+    func uninstallHelperAndWait() async throws
+    func reinstallHelper() async throws
+}
+
+final class PrivilegedHostsWriter: PrivilegedHostsWriting {
 
     static let shared = PrivilegedHostsWriter()
 
@@ -120,10 +158,6 @@ final class PrivilegedHostsWriter {
         return state.shouldForceRepair
     }
 
-    func installHelperIfNeeded() async throws {
-        try await prepareHelper(forceRepair: false)
-    }
-
     func enableHelper() async throws {
         setHelperExplicitlyDisabled(false)
         try await prepareHelper(forceRepair: false)
@@ -151,32 +185,19 @@ final class PrivilegedHostsWriter {
         setHelperExplicitlyDisabled(true)
     }
 
-    func uninstallHelper() async throws {
-        guard hasRegisteredHelper else { return }
-        try await unregisterHelper()
-    }
-
     func reinstallHelper() async throws {
         try await repairHelper()
     }
 
     func writeHosts(content: String) async throws {
         try await prepareHelper(forceRepair: false)
-        guard let conn = makeConnection() else {
-            throw PrivilegedHostsError.connectionFailed
-        }
-        defer { conn.invalidate() }
-
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            let proxy = conn.remoteObjectProxyWithErrorHandler { [weak conn] error in
-                conn?.invalidate()
-                continuation.resume(throwing: error)
-            } as! HostsHelperProtocol
+        // 写入包含 DNS 缓存刷新，给出比读取更宽松的超时
+        try await performHelperCall(timeout: 15) { proxy, complete in
             proxy.writeHosts(content: content) { success, error in
                 if success {
-                    continuation.resume()
+                    complete(.success(()))
                 } else {
-                    continuation.resume(throwing: error ?? PrivilegedHostsError.connectionFailed)
+                    complete(.failure(error ?? PrivilegedHostsError.connectionFailed))
                 }
             }
         }
@@ -184,45 +205,49 @@ final class PrivilegedHostsWriter {
 
     func readHosts() async throws -> String {
         try await prepareHelper(forceRepair: false)
+        return try await performHelperCall(timeout: 5) { proxy, complete in
+            proxy.readHosts { content, error in
+                if let content {
+                    complete(.success(content))
+                } else {
+                    complete(.failure(error ?? PrivilegedHostsError.connectionFailed))
+                }
+            }
+        }
+    }
+
+    /// 统一封装一次 XPC 调用：错误回调、业务回调与超时三者中只有第一个结果生效，避免 continuation 被重复 resume
+    private func performHelperCall<T>(
+        timeout: TimeInterval,
+        _ body: @escaping (HostsHelperProtocol, @escaping (Result<T, Error>) -> Void) -> Void
+    ) async throws -> T {
         guard let conn = makeConnection() else {
             throw PrivilegedHostsError.connectionFailed
         }
         defer { conn.invalidate() }
 
-        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
-            var finished = false
-            let lock = NSLock()
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<T, Error>) in
+            let gate = ResumeOnceGate()
 
-            func resumeOnce(_ result: Result<String, Error>) {
-                lock.lock()
-                defer { lock.unlock() }
-                guard !finished else { return }
-                finished = true
-
-                switch result {
-                case .success(let content):
-                    continuation.resume(returning: content)
-                case .failure(let error):
-                    continuation.resume(throwing: error)
+            func resumeOnce(_ result: Result<T, Error>) {
+                guard gate.tryClaim() else {
+                    return
                 }
+                continuation.resume(with: result)
             }
 
-            DispatchQueue.global().asyncAfter(deadline: .now() + 5) {
+            DispatchQueue.global().asyncAfter(deadline: .now() + timeout) {
                 resumeOnce(.failure(PrivilegedHostsError.timeout))
             }
 
-            let proxy = conn.remoteObjectProxyWithErrorHandler { [weak conn] error in
-                conn?.invalidate()
+            guard let proxy = conn.remoteObjectProxyWithErrorHandler({ error in
                 resumeOnce(.failure(error))
-            } as! HostsHelperProtocol
-
-            proxy.readHosts { content, error in
-                if let content {
-                    resumeOnce(.success(content))
-                } else {
-                    resumeOnce(.failure(error ?? PrivilegedHostsError.connectionFailed))
-                }
+            }) as? HostsHelperProtocol else {
+                resumeOnce(.failure(PrivilegedHostsError.connectionFailed))
+                return
             }
+
+            body(proxy, resumeOnce)
         }
     }
 
@@ -363,14 +388,12 @@ final class PrivilegedHostsWriter {
         defer { conn.invalidate() }
 
         return await withCheckedContinuation { continuation in
-            var finished = false
-            let lock = NSLock()
+            let gate = ResumeOnceGate()
 
             func resumeOnce(_ value: Bool) {
-                lock.lock()
-                defer { lock.unlock() }
-                guard !finished else { return }
-                finished = true
+                guard gate.tryClaim() else {
+                    return
+                }
                 continuation.resume(returning: value)
             }
 
@@ -382,7 +405,12 @@ final class PrivilegedHostsWriter {
                 resumeOnce(false)
             } as? HostsHelperProtocol
 
-            proxy?.ping { success in
+            guard let proxy else {
+                resumeOnce(false)
+                return
+            }
+
+            proxy.ping { success in
                 resumeOnce(success)
             }
         }

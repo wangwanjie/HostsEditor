@@ -23,6 +23,41 @@ enum UpdateCheckStrategy: String, CaseIterable {
     }
 }
 
+/// 远程方案自动刷新间隔
+enum RemoteRefreshInterval: String, CaseIterable {
+    case off
+    case hourly
+    case everySixHours
+    case daily
+
+    /// 刷新间隔秒数；关闭时为 nil
+    var seconds: TimeInterval? {
+        switch self {
+        case .off:
+            return nil
+        case .hourly:
+            return 60 * 60
+        case .everySixHours:
+            return 6 * 60 * 60
+        case .daily:
+            return 24 * 60 * 60
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .off:
+            return L10n.tr("settings.remote_refresh.off")
+        case .hourly:
+            return L10n.tr("settings.remote_refresh.hourly")
+        case .everySixHours:
+            return L10n.tr("settings.remote_refresh.six_hours")
+        case .daily:
+            return L10n.tr("settings.remote_refresh.daily")
+        }
+    }
+}
+
 @MainActor
 final class AppSettings: ObservableObject {
     static let shared = AppSettings()
@@ -37,6 +72,7 @@ final class AppSettings: ObservableObject {
     static let defaultSidebarWidth: Double = 220
     static let minSidebarWidth: Double = 160
     static let maxSidebarWidth: Double = 420
+    static let defaultRemoteRefreshInterval: RemoteRefreshInterval = .off
 
     private let database: AppDatabase
 
@@ -87,6 +123,15 @@ final class AppSettings: ObservableObject {
         }
     }
 
+    @Published var remoteRefreshInterval: RemoteRefreshInterval {
+        didSet {
+            guard oldValue != remoteRefreshInterval else {
+                return
+            }
+            persistSetting(.remoteRefreshInterval, value: .string(remoteRefreshInterval.rawValue))
+        }
+    }
+
     init(database: AppDatabase? = nil) {
         self.database = database ?? .shared
 
@@ -95,6 +140,7 @@ final class AppSettings: ObservableObject {
         updateCheckStrategy = Self.defaultUpdateCheckStrategy
         editorFontSize = Self.defaultEditorFontSize
         sidebarWidth = Self.defaultSidebarWidth
+        remoteRefreshInterval = Self.defaultRemoteRefreshInterval
 
         loadPersistedValues()
 
@@ -108,6 +154,7 @@ final class AppSettings: ObservableObject {
         updateCheckStrategy = Self.defaultUpdateCheckStrategy
         editorFontSize = Self.defaultEditorFontSize
         sidebarWidth = Self.defaultSidebarWidth
+        remoteRefreshInterval = Self.defaultRemoteRefreshInterval
     }
 
     func adjustEditorFontSize(by delta: Double) {
@@ -149,6 +196,11 @@ final class AppSettings: ObservableObject {
 
             if case .double(let storedSidebarWidth)? = try database.settingValue(.sidebarWidth) {
                 sidebarWidth = Self.clampedSidebarWidth(storedSidebarWidth)
+            }
+
+            if case .string(let rawInterval)? = try database.settingValue(.remoteRefreshInterval),
+               let interval = RemoteRefreshInterval(rawValue: rawInterval) {
+                remoteRefreshInterval = interval
             }
         } catch {
             NSLog("Failed to load AppSettings from database: %@", String(describing: error))

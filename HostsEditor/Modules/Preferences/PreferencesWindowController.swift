@@ -71,6 +71,10 @@ final class PreferencesWindowController: NSWindowController {
         preferencesViewController.debugAppearancePopup
     }
 
+    var debugRemoteRefreshPopup: NSPopUpButton {
+        preferencesViewController.debugRemoteRefreshPopup
+    }
+
     var debugSectionLabels: [String] {
         preferencesViewController.debugSectionLabels
     }
@@ -130,6 +134,7 @@ private final class PreferencesViewController: NSViewController {
 
     private var languagePopup: NSPopUpButton!
     private var appearancePopup: NSPopUpButton!
+    private var remoteRefreshPopup: NSPopUpButton!
     private var updateStrategyPopup: NSPopUpButton!
     private var automaticDownloadsCheckbox: NSButton!
     private var automaticDownloadsHintLabel: NSTextField!
@@ -147,6 +152,7 @@ private final class PreferencesViewController: NSViewController {
 
     private var generalLanguageLabel: NSTextField!
     private var generalAppearanceLabel: NSTextField!
+    private var generalRemoteRefreshLabel: NSTextField!
     private var updatesStrategyLabel: NSTextField!
     private var editorFontSizeLabel: NSTextField!
     private var helperStatusTitleLabel: NSTextField!
@@ -197,6 +203,7 @@ private final class PreferencesViewController: NSViewController {
         generalSectionView = makeSectionCard(contentViews: [
             makeLabeledRow(labelStorage: &generalLanguageLabel, title: L10n.preferencesLanguage, control: makeLanguagePopup()),
             makeLabeledRow(labelStorage: &generalAppearanceLabel, title: L10n.preferencesAppearance, control: makeAppearancePopup()),
+            makeLabeledRow(labelStorage: &generalRemoteRefreshLabel, title: L10n.tr("preferences.remote_refresh"), control: makeRemoteRefreshPopup()),
         ])
 
         updatesSectionView = makeSectionCard(contentViews: [
@@ -253,6 +260,13 @@ private final class PreferencesViewController: NSViewController {
             }
             .store(in: &cancellables)
 
+        settings.$remoteRefreshInterval
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.syncControlsFromSettings()
+            }
+            .store(in: &cancellables)
+
         AppLocalization.shared.$language
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in
@@ -280,6 +294,7 @@ private final class PreferencesViewController: NSViewController {
 
         generalLanguageLabel.stringValue = L10n.preferencesLanguage
         generalAppearanceLabel.stringValue = L10n.preferencesAppearance
+        generalRemoteRefreshLabel.stringValue = L10n.tr("preferences.remote_refresh")
         updatesStrategyLabel.stringValue = L10n.preferencesUpdateCheckStrategy
         editorFontSizeLabel.stringValue = L10n.preferencesEditorFontSize
         helperStatusTitleLabel.stringValue = L10n.preferencesCurrentStatus
@@ -293,6 +308,7 @@ private final class PreferencesViewController: NSViewController {
 
         rebuildLanguagePopup()
         rebuildAppearancePopup()
+        rebuildRemoteRefreshPopup()
         rebuildUpdateStrategyPopup()
     }
 
@@ -326,6 +342,9 @@ private final class PreferencesViewController: NSViewController {
         }
         if let appearanceIndex = AppAppearance.allCases.firstIndex(of: settings.appAppearance) {
             appearancePopup.selectItem(at: appearanceIndex)
+        }
+        if let refreshIndex = RemoteRefreshInterval.allCases.firstIndex(of: settings.remoteRefreshInterval) {
+            remoteRefreshPopup.selectItem(at: refreshIndex)
         }
         if let strategyIndex = UpdateCheckStrategy.allCases.firstIndex(of: settings.updateCheckStrategy) {
             updateStrategyPopup.selectItem(at: strategyIndex)
@@ -526,6 +545,16 @@ private final class PreferencesViewController: NSViewController {
         return appearancePopup
     }
 
+    private func makeRemoteRefreshPopup() -> NSView {
+        remoteRefreshPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+        remoteRefreshPopup.target = self
+        remoteRefreshPopup.action = #selector(remoteRefreshChanged(_:))
+        remoteRefreshPopup.snp.makeConstraints { make in
+            make.width.equalTo(200)
+        }
+        return remoteRefreshPopup
+    }
+
     private func makeUpdateStrategyControl() -> NSView {
         updateStrategyPopup = NSPopUpButton(frame: .zero, pullsDown: false)
         updateStrategyPopup.target = self
@@ -644,6 +673,11 @@ private final class PreferencesViewController: NSViewController {
         appearancePopup.addItems(withTitles: AppAppearance.allCases.map(L10n.appearanceName))
     }
 
+    private func rebuildRemoteRefreshPopup() {
+        remoteRefreshPopup.removeAllItems()
+        remoteRefreshPopup.addItems(withTitles: RemoteRefreshInterval.allCases.map(\.title))
+    }
+
     private func rebuildUpdateStrategyPopup() {
         updateStrategyPopup.removeAllItems()
         updateStrategyPopup.addItems(withTitles: UpdateCheckStrategy.allCases.map(\.title))
@@ -665,6 +699,14 @@ private final class PreferencesViewController: NSViewController {
         let selectedIndex = sender.indexOfSelectedItem
         guard AppAppearance.allCases.indices.contains(selectedIndex) else { return }
         settings.appAppearance = AppAppearance.allCases[selectedIndex]
+    }
+
+    @objc private func remoteRefreshChanged(_ sender: NSPopUpButton) {
+        let selectedIndex = sender.indexOfSelectedItem
+        guard RemoteRefreshInterval.allCases.indices.contains(selectedIndex) else {
+            return
+        }
+        settings.remoteRefreshInterval = RemoteRefreshInterval.allCases[selectedIndex]
     }
 
     @objc private func updateStrategyChanged(_ sender: NSPopUpButton) {
@@ -791,6 +833,10 @@ private final class PreferencesViewController: NSViewController {
 
     var debugAppearancePopup: NSPopUpButton {
         appearancePopup
+    }
+
+    var debugRemoteRefreshPopup: NSPopUpButton {
+        remoteRefreshPopup
     }
 
     var debugSectionLabels: [String] {

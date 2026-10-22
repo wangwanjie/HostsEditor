@@ -38,4 +38,29 @@ struct HostsManagerDatabaseTests {
         #expect(manager.profiles == profiles)
         #expect(manager.baseSystemContent == "127.0.0.1 localhost")
     }
+
+    @MainActor
+    @Test
+    func remoteRefreshIntervalPersistsAndResetsToDefault() throws {
+        let database = try AppDatabase.inMemory()
+        let settings = AppSettings(database: database)
+        #expect(settings.remoteRefreshInterval == AppSettings.defaultRemoteRefreshInterval)
+
+        settings.remoteRefreshInterval = .everySixHours
+
+        #expect(try database.settingValue(.remoteRefreshInterval) == .string(RemoteRefreshInterval.everySixHours.rawValue))
+        #expect(AppSettings(database: database).remoteRefreshInterval == .everySixHours)
+
+        settings.resetToDefaults()
+        #expect(AppSettings(database: database).remoteRefreshInterval == AppSettings.defaultRemoteRefreshInterval)
+    }
+
+    @MainActor
+    @Test
+    func unknownPersistedRemoteRefreshIntervalFallsBackToDefault() throws {
+        let database = try AppDatabase.inMemory()
+        try database.saveSetting(.remoteRefreshInterval, value: .string("every-minute"))
+
+        #expect(AppSettings(database: database).remoteRefreshInterval == AppSettings.defaultRemoteRefreshInterval)
+    }
 }

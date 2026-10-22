@@ -134,6 +134,10 @@ extension ViewController: NSUserInterfaceValidations {
             return view.window?.contentViewController === self
         case #selector(toggleCommentSelection(_:)):
             return view.window?.contentViewController === self && canEditCurrentSelection
+        case #selector(saveAndApplyFromMenu(_:)):
+            return applyButton?.isEnabled == true
+        case #selector(showBackupsInFinder(_:)):
+            return manager.backupDirectoryURL != nil
         default:
             return true
         }
@@ -157,6 +161,11 @@ extension ViewController: ProfileTableViewContextMenuDelegate {
         toggleItem.target = self
         toggleItem.representedObject = id
         menu.addItem(toggleItem)
+
+        let duplicateItem = NSMenuItem(title: L10n.tr("main.context.duplicate"), action: #selector(duplicateProfileFromContextMenu(_:)), keyEquivalent: "")
+        duplicateItem.target = self
+        duplicateItem.representedObject = id
+        menu.addItem(duplicateItem)
 
         if profile.isRemote {
             let refreshItem = NSMenuItem(title: L10n.mainRefreshRemote, action: #selector(refreshRemoteFromContextMenu(_:)), keyEquivalent: "")
