@@ -1,0 +1,20 @@
+<?xml version='1.0' encoding='utf-8'?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+    <channel>
+        <title>HostsEditor</title>
+        <item>
+            <title>1.8.0</title>
+            <pubDate>Thu, 22 Oct 2026 09:53:19 +0800</pubDate>
+            <link>https://github.com/wangwanjie/HostsEditor/releases/tag/v1.8.0</link>
+            <sparkle:version>12</sparkle:version>
+            <sparkle:shortVersionString>1.8.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/wangwanjie/HostsEditor/releases/download/v1.8.0/HostsEditor_V_1.8.0_x86_64.dmg" length="4265079" type="application/octet-stream" sparkle:edSignature="3GP9bbVbUX61T0M0mHdUj2ER8bqrP6ttRV6erl3jQIwogzSNQ1eJeF781jKVyxPcx2ik8Z7IvXQARPJqED77AA==" />
+            <description>&lt;h1&gt;更新内容&lt;/h1&gt;
+&lt;ul&gt;&lt;li&gt;安装包按芯片拆分：Apple 芯片请下载 `_arm64.dmg`，Intel 芯片请下载 `_x86_64.dmg`，体积更小，自动更新只推送同架构版本。&lt;/li&gt;&lt;li&gt;新增「文件」菜单：新建本地/远程方案、导入 hosts 文件为方案（⌘O）、保存并应用（⌘S）、导出当前内容（⇧⌘S）。&lt;/li&gt;&lt;li&gt;每次写入系统 hosts 前自动备份旧内容（保留最近 30 份），可在「文件 → 在访达中显示 hosts 备份」查看。&lt;/li&gt;&lt;li&gt;远程方案支持按间隔自动刷新（偏好设置 → 通用），并会校验返回状态，避免把错误页面当成 hosts 保存；重复添加同一地址时改为刷新已有方案。&lt;/li&gt;&lt;li&gt;方案右键菜单新增「复制方案」；有未保存的修改时窗口会给出提示，退出前会二次确认。&lt;/li&gt;&lt;li&gt;写入 hosts 后自动刷新 DNS 缓存，修改立即生效；写入前会重新读取系统 hosts，不再覆盖其他工具的改动。&lt;/li&gt;&lt;li&gt;修复快速连续切换方案时写入交错、远程刷新失败提示被清空、在偏好设置窗口按删除键误删方案等问题，并加强后台帮助程序的连接校验。&lt;/li&gt;&lt;/ul&gt;</description>
+        </item>
+        <link>https://github.com/wangwanjie/HostsEditor</link>
+        <description>HostsEditor release feed.</description>
+        <language>zh-CN</language>
+    </channel>
+</rss>
