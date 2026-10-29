@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HostsEditor — macOS Hosts 文件编辑与方案切换工具</title>
+<meta name="description" content="HostsEditor 是 macOS 上的 Hosts 文件编辑与方案切换工具：多方案管理、远程方案、菜单栏快速切换，通过特权 Helper 安全写回 /etc/hosts。">
+<meta property="og:title" content="HostsEditor — macOS Hosts 文件编辑与方案切换工具">
+<meta property="og:description" content="在多套 hosts 配置之间稳定切换。支持 Apple 芯片与 Intel，macOS 13 及以上。">
+<meta property="og:image" content="https://wangwanjie.github.io/HostsEditor/assets/icon.png">
+<meta name="color-scheme" content="dark light">
+<link rel="icon" type="image/png" href="assets/icon-256.png">
+<style>
+  :root {
+    --bg: #0a0f24;
+    --nav-bg: rgba(10, 15, 36, 0.6);
+    --card: rgba(255, 255, 255, 0.045);
+    --card-border: rgba(255, 255, 255, 0.08);
+    --text: #eef1fb;
+    --muted: #9aa3c4;
+    --accent: #3b6cf6;
+    --accent-2: #7c4ddb;
+    --glow-1: rgba(59, 108, 246, 0.30);
+    --glow-2: rgba(124, 77, 219, 0.16);
+    --step-bg: rgba(59, 108, 246, 0.22);
+    --step-text: #c9d6ff;
+    --code-bg: rgba(255, 255, 255, 0.08);
+    --shot-shadow: 0 40px 120px rgba(0, 0, 0, .6), 0 0 0 1px rgba(255, 255, 255, .06);
+    --radius: 18px;
+    --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  /* 亮色外观：跟随系统 */
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f5f7fc;
+      --nav-bg: rgba(245, 247, 252, 0.72);
+      --card: rgba(255, 255, 255, 0.8);
+      --card-border: rgba(20, 30, 70, 0.10);
+      --text: #141a33;
+      --muted: #5a6385;
+      --glow-1: rgba(59, 108, 246, 0.18);
+      --glow-2: rgba(124, 77, 219, 0.10);
+      --step-bg: rgba(59, 108, 246, 0.14);
+      --step-text: #2c4fc2;
+      --code-bg: rgba(20, 30, 70, 0.07);
+      --shot-shadow: 0 30px 90px rgba(20, 30, 70, .22), 0 0 0 1px rgba(20, 30, 70, .08);
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: var(--sans);
+    color: var(--text);
+    background:
+      radial-gradient(1200px 600px at 50% -10%, var(--glow-1), transparent 60%),
+      radial-gradient(800px 500px at 90% 30%, var(--glow-2), transparent 60%),
+      var(--bg);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+
+  nav {
+    position: sticky; top: 0; z-index: 10;
+    backdrop-filter: saturate(180%) blur(18px);
+    -webkit-backdrop-filter: saturate(180%) blur(18px);
+    background: var(--nav-bg);
+    border-bottom: 1px solid var(--card-border);
+  }
+  nav .wrap { display: flex; align-items: center; height: 56px; gap: 28px; }
+  nav .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; text-decoration: none; }
+  nav .brand img { width: 26px; height: 26px; }
+  nav .links { margin-left: auto; display: flex; gap: 22px; font-size: 14px; }
+  nav .links a { color: var(--muted); text-decoration: none; }
+  nav .links a:hover { color: var(--text); }
+  nav .lang { cursor: pointer; border: 1px solid var(--card-border); border-radius: 999px; padding: 3px 12px; background: none; color: var(--muted); font: inherit; font-size: 13px; }
+
+  header.hero { text-align: center; padding: 88px 0 40px; }
+  .hero img.icon { width: 148px; height: 148px; filter: drop-shadow(0 24px 48px rgba(59, 108, 246, 0.45)); }
+  .hero h1 { font-size: clamp(40px, 7vw, 68px); letter-spacing: -0.03em; margin: 18px 0 8px; line-height: 1.05; }
+  .hero h1 span {
+    background: linear-gradient(120deg, #8fb0ff, #3b6cf6 45%, #7c4ddb);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .hero p.lead { font-size: clamp(17px, 2.2vw, 21px); color: var(--muted); max-width: 720px; margin: 0 auto; }
+  .downloads { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; margin: 36px 0 14px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 10px; text-align: left;
+    padding: 13px 22px; border-radius: 14px; text-decoration: none; font-weight: 600; font-size: 16px;
+    transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
+  }
+  .btn small { display: block; font-weight: 400; font-size: 12px; opacity: .75; }
+  .btn.primary { color: #fff; background: linear-gradient(135deg, var(--accent), var(--accent-2)); box-shadow: 0 10px 30px rgba(59, 108, 246, .35); }
+  .btn.secondary { background: var(--card); border: 1px solid var(--card-border); }
+  .btn:hover { transform: translateY(-2px); }
+  .btn svg { width: 22px; height: 22px; flex: none; }
+  .meta { color: var(--muted); font-size: 13px; }
+  .meta a { color: var(--muted); }
+
+  .shot { margin: 56px auto 0; max-width: 1000px; }
+  .shot img { width: 100%; display: block; border-radius: 14px; box-shadow: var(--shot-shadow); }
+  .shot p { color: var(--muted); font-size: 14px; max-width: 760px; margin: 18px auto 0; }
+
+  section { padding: 96px 0 0; }
+  section h2 { font-size: clamp(28px, 4vw, 40px); letter-spacing: -0.02em; margin: 0 0 8px; text-align: center; }
+  section p.sub { text-align: center; color: var(--muted); margin: 0 auto 44px; max-width: 640px; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
+  .card {
+    background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius);
+    padding: 20px; transition: border-color .15s ease, transform .15s ease;
+  }
+  .card:hover { border-color: rgba(59, 108, 246, .45); transform: translateY(-2px); }
+  .card .tile {
+    width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center;
+    font-size: 19px; color: #fff; margin-bottom: 12px;
+  }
+  .card h3 { margin: 0 0 4px; font-size: 17px; }
+  .card p { margin: 0; color: var(--muted); font-size: 14px; }
+
+  .points { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+  .point { padding: 24px; border-radius: var(--radius); background: var(--card); border: 1px solid var(--card-border); }
+  .point b { display: block; font-size: 18px; margin-bottom: 6px; }
+  .point span { color: var(--muted); font-size: 14px; }
+
+  pre.block {
+    max-width: 720px; margin: 0 auto 20px; padding: 18px 20px; border-radius: 14px; overflow-x: auto;
+    background: var(--card); border: 1px solid var(--card-border); font: 14px/1.7 var(--mono); color: var(--muted);
+  }
+  pre.block b { color: var(--text); font-weight: 600; }
+
+  .install ol { counter-reset: step; list-style: none; padding: 0; margin: 0 auto; max-width: 720px; }
+  .install li { counter-increment: step; position: relative; padding: 18px 20px 18px 64px; margin-bottom: 10px; background: var(--card); border: 1px solid var(--card-border); border-radius: 14px; }
+  .install li::before {
+    content: counter(step); position: absolute; left: 18px; top: 16px; width: 30px; height: 30px; border-radius: 50%;
+    display: grid; place-items: center; font-weight: 700; background: var(--step-bg); color: var(--step-text);
+  }
+  code { background: var(--code-bg); border-radius: 6px; padding: 1px 6px; font-size: 13px; font-family: var(--mono); }
+
+  footer { margin-top: 110px; padding: 36px 0 48px; border-top: 1px solid var(--card-border); color: var(--muted); font-size: 13px; }
+  footer .wrap { display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; }
+  footer a { color: var(--muted); }
+
+  [data-lang="en"] .zh, [data-lang="zh"] .en { display: none !important; }
+
+  @media (max-width: 640px) {
+    nav .links a.hide-sm { display: none; }
+    header.hero { padding-top: 56px; }
+  }
+</style>
+</head>
+<body data-lang="zh">
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="#"><img src="assets/icon-256.png" alt="">HostsEditor</a>
+    <div class="links">
+      <a class="hide-sm" href="#features"><span class="zh">功能</span><span class="en">Features</span></a>
+      <a class="hide-sm" href="#install"><span class="zh">安装</span><span class="en">Install</span></a>
+      <a href="https://github.com/wangwanjie/HostsEditor/releases"><span class="zh">版本历史</span><span class="en">Releases</span></a>
+      <a href="https://github.com/wangwanjie/HostsEditor">GitHub</a>
+    </div>
+    <button class="lang" id="lang-toggle" type="button">EN</button>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <img class="icon" src="assets/icon.png" alt="HostsEditor">
+    <h1><span>HostsEditor</span></h1>
+    <p class="lead">
+      <span class="zh">macOS 上的 Hosts 文件编辑与方案切换工具。在多套 hosts 配置之间稳定切换，通过特权 Helper 安全写回 <code>/etc/hosts</code>。</span>
+      <span class="en">A hosts file editor and profile switcher for macOS. Switch between multiple hosts setups reliably, and write <code>/etc/hosts</code> safely through a privileged helper.</span>
+    </p>
+    <div class="downloads">
+      <!-- 安装包文件名带版本号，默认指向最新 Release 页，页面加载后再替换为实际下载地址 -->
+      <a class="btn primary" id="dl-arm" href="https://github.com/wangwanjie/HostsEditor/releases/latest">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0-5-5m5 5 5-5M5 21h14"/></svg>
+        <span><span class="zh">下载 Apple 芯片版</span><span class="en">Download for Apple silicon</span><small>M1 / M2 / M3 / M4 …</small></span>
+      </a>
+      <a class="btn secondary" id="dl-intel" href="https://github.com/wangwanjie/HostsEditor/releases/latest">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0-5-5m5 5 5-5M5 21h14"/></svg>
+        <span><span class="zh">下载 Intel 版</span><span class="en">Download for Intel</span><small>x86_64</small></span>
+      </a>
+    </div>
+    <div class="meta">
+      <span class="zh">免费 · macOS 13.0 及以上 · 已通过 Apple 公证 · 内置自动更新</span>
+      <span class="en">Free · macOS 13.0 or later · Notarized by Apple · Built-in auto update</span>
+      <span id="version"></span>
+    </div>
+
+    <div class="shot">
+      <img src="assets/screenshots/home.png" alt="HostsEditor">
+      <p>
+        <span class="zh">左侧是方案列表：「系统」为当前 /etc/hosts 全文，「默认」为剥离 HostsEditor 管理块后的基础内容，下方是本地方案与远程方案，勾选即启用；右侧是带语法高亮的编辑器。</span>
+        <span class="en">Profiles on the left: “System” is the full /etc/hosts, “Default” is the base content without HostsEditor blocks, followed by local and remote profiles — tick to enable. On the right, an editor with syntax highlighting.</span>
+      </p>
+    </div>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <div class="points">
+      <div class="point"><b><span class="zh">只改自己的部分</span><span class="en">Touches only its own blocks</span></b><span class="zh">保留系统 hosts 中不属于 HostsEditor 管理块的内容，写入前重新读取，不覆盖其他工具的修改。</span><span class="en">Content outside HostsEditor blocks is kept, and the file is re-read before writing so other tools’ changes survive.</span></div>
+      <div class="point"><b><span class="zh">立即生效</span><span class="en">Takes effect immediately</span></b><span class="zh">写入后自动刷新 DNS 缓存，切换方案无需手动操作。</span><span class="en">The DNS cache is flushed after every write, so switching profiles needs no extra steps.</span></div>
+      <div class="point"><b><span class="zh">权限分离</span><span class="en">Privilege separation</span></b><span class="zh">主应用不以 root 运行，写入 /etc/hosts 由经 XPC 调用的特权 Helper 完成。</span><span class="en">The app never runs as root; writes go through a privileged helper over XPC.</span></div>
+      <div class="point"><b><span class="zh">三种语言</span><span class="en">Three languages</span></b><span class="zh">简体中文、繁體中文、English，支持浅色和深色外观。</span><span class="en">Simplified Chinese, Traditional Chinese and English, in light and dark appearance.</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="features">
+  <div class="wrap">
+    <h2><span class="zh">功能</span><span class="en">Features</span></h2>
+    <p class="sub"><span class="zh">本地开发切换环境、团队分发共享配置、菜单栏一键开关，都在一个原生 App 里。</span><span class="en">Switch dev environments, share team configs by URL and toggle profiles from the menu bar — in one native app.</span></p>
+    <div class="grid" id="feature-grid"></div>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap">
+    <h2><span class="zh">工作方式</span><span class="en">How it works</span></h2>
+    <p class="sub"><span class="zh">应用管理的内容写成带标记的块，多个启用方案可以组合写入，原始基础内容保持不变。</span><span class="en">Managed content is written as marked blocks, so several enabled profiles combine while your original base content stays intact.</span></p>
+    <pre class="block">127.0.0.1        localhost
+
+<b># HostsEditor:BEGIN:&lt;profile-id&gt;</b>
+127.0.0.1        api.example.dev
+<b># HostsEditor:END:&lt;profile-id&gt;</b></pre>
+  </div>
+</section>
+
+<section id="install" class="install">
+  <div class="wrap">
+    <h2><span class="zh">安装</span><span class="en">Install</span></h2>
+    <p class="sub"><span class="zh">不确定芯片类型？打开「苹果菜单 › 关于本机」，看“芯片”或“处理器”一栏。</span><span class="en">Not sure which chip you have? Open  › About This Mac and check “Chip” or “Processor”.</span></p>
+    <ol>
+      <li><span class="zh">下载与本机芯片匹配的 DMG，打开后把 HostsEditor 拖进「应用程序」文件夹。</span><span class="en">Download the DMG for your chip, open it and drag HostsEditor into Applications.</span></li>
+      <li><span class="zh">打开 HostsEditor。首次读取或写入系统 hosts 时，应用会注册特权 Helper，按系统提示输入管理员密码。</span><span class="en">Launch HostsEditor. The first time it reads or writes the system hosts file it registers a privileged helper; enter your administrator password when asked.</span></li>
+      <li><span class="zh">如果出现“需要允许后台程序”，前往「系统设置 › 通用 › 登录项与扩展程序」允许 HostsEditor 的后台程序，然后重新打开应用。</span><span class="en">If macOS asks to allow a background item, go to System Settings › General › Login Items &amp; Extensions, allow HostsEditor, then reopen the app.</span></li>
+      <li><span class="zh">点击左下角「新建」创建本地方案或远程方案，勾选即启用，<code>⌘S</code> 保存并应用。</span><span class="en">Click “New” to create a local or remote profile, tick it to enable, and press <code>⌘S</code> to save and apply.</span></li>
+    </ol>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span>© 2026 VanJay · HostsEditor</span>
+    <span>
+      <a href="https://github.com/wangwanjie/HostsEditor/releases"><span class="zh">版本历史</span><span class="en">Releases</span></a> ·
+      <a href="https://github.com/wangwanjie/HostsEditor/issues"><span class="zh">反馈问题</span><span class="en">Feedback</span></a>
+    </span>
+  </div>
+</footer>
+
+<script>
+  // 功能卡片：[图标, 颜色, 中文名, 英文名, 中文说明, 英文说明]
+  const features = [
+    ["☰", "#3b6cf6", "多方案管理", "Multiple profiles", "创建多套本地 hosts 方案，按需启用、停用、复制或删除。", "Keep several local hosts profiles; enable, disable, duplicate or delete them as needed."],
+    ["⇪", "#7c4ddb", "系统级应用", "System-wide apply", "将启用中的方案组合后写入 /etc/hosts，写入后自动刷新 DNS 缓存，立即生效。", "Enabled profiles are combined into /etc/hosts and the DNS cache is flushed right away."],
+    ["☁", "#0ea5e9", "远程方案", "Remote profiles", "从 http / https 地址拉取 hosts 内容，支持手动刷新和按间隔自动刷新。", "Fetch hosts content from an http / https URL, refreshed manually or on a schedule."],
+    ["⇄", "#14b8a6", "导入导出", "Import & export", "把本地 hosts 文件导入为方案，也可把当前内容导出为文本文件。", "Import a hosts file as a profile, or export the current content as a text file."],
+    ["⟲", "#f59e0b", "自动备份", "Automatic backups", "每次写入前备份旧内容，保留最近 30 份，可从「文件」菜单在访达中查看。", "The previous file is backed up before each write; the latest 30 are kept and reachable from the File menu."],
+    ["◉", "#6366f1", "菜单栏切换", "Menu bar toggle", "通过状态栏图标快速启用或关闭方案。", "Enable or disable profiles straight from the menu bar icon."],
+    ["✎", "#ec4899", "编辑器", "Editor", "注释、IP（含 IPv6）、主机名语法高亮，查找替换、批量注释（⌘/）。", "Highlighting for comments, IPs (including IPv6) and hostnames; find & replace; toggle comments with ⌘/."],
+    ["✓", "#22c55e", "防误操作", "Safe editing", "有未保存修改时窗口关闭按钮显示提示点，退出前二次确认。", "Unsaved changes are marked on the close button and confirmed before quitting."],
+    ["↻", "#ef4444", "自动更新", "Auto update", "集成 Sparkle，按芯片架构分别推送更新。", "Built-in Sparkle updates, delivered per chip architecture."]
+  ];
+
+  const grid = document.getElementById("feature-grid");
+  for (const [glyph, color, zh, en, zhText, enText] of features) {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML =
+      `<div class="tile" style="background:${color}">${glyph}</div>` +
+      `<h3><span class="zh">${zh}</span><span class="en">${en}</span></h3>` +
+      `<p><span class="zh">${zhText}</span><span class="en">${enText}</span></p>`;
+    grid.appendChild(card);
+  }
+
+  // 语言：默认跟随浏览器，记住用户的选择
+  const toggle = document.getElementById("lang-toggle");
+  function applyLanguage(lang) {
+    document.body.dataset.lang = lang;
+    document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
+    toggle.textContent = lang === "zh" ? "EN" : "中文";
+    localStorage.setItem("hostseditor.lang", lang);
+  }
+  const saved = localStorage.getItem("hostseditor.lang");
+  applyLanguage(saved || (navigator.language.toLowerCase().startsWith("zh") ? "zh" : "en"));
+  toggle.addEventListener("click", () => applyLanguage(document.body.dataset.lang === "zh" ? "en" : "zh"));
+
+  // 尽量识别 Intel Mac（浏览器无法可靠区分时保持 Apple 芯片优先）
+  try {
+    const canvas = document.createElement("canvas");
+    const gl = canvas.getContext("webgl");
+    const info = gl && gl.getExtension("WEBGL_debug_renderer_info");
+    const renderer = info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : "";
+    if (/Intel|AMD|Radeon/i.test(renderer) && !/Apple/i.test(renderer)) {
+      document.getElementById("dl-intel").className = "btn primary";
+      document.getElementById("dl-arm").className = "btn secondary";
+      document.querySelector(".downloads").prepend(document.getElementById("dl-intel"));
+    }
+  } catch (error) {}
+
+  // 显示最新版本号，并把下载按钮换成对应架构安装包的直链
+  fetch("https://api.github.com/repos/wangwanjie/HostsEditor/releases/latest")
+    .then((response) => (response.ok ? response.json() : null))
+    .then((release) => {
+      if (!release || !release.tag_name) {
+        return;
+      }
+      document.getElementById("version").textContent = ` · ${release.tag_name}`;
+      for (const asset of release.assets || []) {
+        if (/_arm64\.dmg$/.test(asset.name)) {
+          document.getElementById("dl-arm").href = asset.browser_download_url;
+        } else if (/_x86_64\.dmg$/.test(asset.name)) {
+          document.getElementById("dl-intel").href = asset.browser_download_url;
+        }
+      }
+    })
+    .catch(() => {});
+</script>
+</body>
+</html>
