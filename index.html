@@ -1,328 +1,311 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="dark">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>HostsEditor — macOS Hosts 文件编辑与方案切换工具</title>
-<meta name="description" content="HostsEditor 是 macOS 上的 Hosts 文件编辑与方案切换工具：多方案管理、远程方案、菜单栏快速切换，通过特权 Helper 安全写回 /etc/hosts。">
-<meta property="og:title" content="HostsEditor — macOS Hosts 文件编辑与方案切换工具">
-<meta property="og:description" content="在多套 hosts 配置之间稳定切换。支持 Apple 芯片与 Intel，macOS 13 及以上。">
-<meta property="og:image" content="https://wangwanjie.github.io/HostsEditor/assets/icon.png">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>HostsEditor — macOS hosts 文件编辑与方案切换工具</title>
+<meta name="description" content="HostsEditor 是 macOS 上的 hosts 文件编辑与方案切换工具：多方案管理、远程方案、菜单栏快速切换，通过特权 Helper 安全写回 /etc/hosts 并自动刷新 DNS 缓存。">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="HostsEditor">
+<meta property="og:title" content="HostsEditor — macOS hosts 文件编辑与方案切换工具">
+<meta property="og:description" content="HostsEditor 是 macOS 上的 hosts 文件编辑与方案切换工具：多方案管理、远程方案、菜单栏快速切换，通过特权 Helper 安全写回 /etc/hosts 并自动刷新 DNS 缓存。">
+<meta property="og:image" content="assets/screenshots/home.webp">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#1e2127">
 <meta name="color-scheme" content="dark light">
-<link rel="icon" type="image/png" href="assets/icon-256.png">
-<style>
-  :root {
-    --bg: #0a0f24;
-    --nav-bg: rgba(10, 15, 36, 0.6);
-    --card: rgba(255, 255, 255, 0.045);
-    --card-border: rgba(255, 255, 255, 0.08);
-    --text: #eef1fb;
-    --muted: #9aa3c4;
-    --accent: #3b6cf6;
-    --accent-2: #7c4ddb;
-    --glow-1: rgba(59, 108, 246, 0.30);
-    --glow-2: rgba(124, 77, 219, 0.16);
-    --step-bg: rgba(59, 108, 246, 0.22);
-    --step-text: #c9d6ff;
-    --code-bg: rgba(255, 255, 255, 0.08);
-    --shot-shadow: 0 40px 120px rgba(0, 0, 0, .6), 0 0 0 1px rgba(255, 255, 255, .06);
-    --radius: 18px;
-    --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+<link rel="canonical" href="https://hostseditor.vanjay.cn/">
+<link rel="icon" type="image/png" sizes="64x64" href="assets/icon-64.png">
+<link rel="apple-touch-icon" href="assets/icon-256.png">
+<script>
+/* 首屏前确定主题与语言，避免闪烁；URL 参数优先于 localStorage */
+(function () {
+  var d = document.documentElement, p = new URLSearchParams(location.search), t = p.get('theme'), s = null;
+  try { s = localStorage.getItem('hostseditor.theme'); } catch (e) {}
+  if (t !== 'light' && t !== 'dark' && t !== 'system') {
+    t = (s === 'light' || s === 'dark' || s === 'system') ? s : 'system';
   }
-  /* 亮色外观：跟随系统 */
-  @media (prefers-color-scheme: light) {
-    :root {
-      --bg: #f5f7fc;
-      --nav-bg: rgba(245, 247, 252, 0.72);
-      --card: rgba(255, 255, 255, 0.8);
-      --card-border: rgba(20, 30, 70, 0.10);
-      --text: #141a33;
-      --muted: #5a6385;
-      --glow-1: rgba(59, 108, 246, 0.18);
-      --glow-2: rgba(124, 77, 219, 0.10);
-      --step-bg: rgba(59, 108, 246, 0.14);
-      --step-text: #2c4fc2;
-      --code-bg: rgba(20, 30, 70, 0.07);
-      --shot-shadow: 0 30px 90px rgba(20, 30, 70, .22), 0 0 0 1px rgba(20, 30, 70, .08);
-    }
+  var r = t === 'system' ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : t;
+  d.setAttribute('data-theme', r);
+  d.setAttribute('data-theme-pref', t);
+  var m = document.querySelector('meta[name="theme-color"]');
+  if (m) {
+    m.setAttribute('content', r === 'dark' ? '#1e2127' : '#ffffff');
   }
-  * { box-sizing: border-box; }
-  html { scroll-behavior: smooth; }
-  body {
-    margin: 0;
-    font-family: var(--sans);
-    color: var(--text);
-    background:
-      radial-gradient(1200px 600px at 50% -10%, var(--glow-1), transparent 60%),
-      radial-gradient(800px 500px at 90% 30%, var(--glow-2), transparent 60%),
-      var(--bg);
-    line-height: 1.6;
-    -webkit-font-smoothing: antialiased;
-  }
-  a { color: inherit; }
-  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
-
-  nav {
-    position: sticky; top: 0; z-index: 10;
-    backdrop-filter: saturate(180%) blur(18px);
-    -webkit-backdrop-filter: saturate(180%) blur(18px);
-    background: var(--nav-bg);
-    border-bottom: 1px solid var(--card-border);
-  }
-  nav .wrap { display: flex; align-items: center; height: 56px; gap: 28px; }
-  nav .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; text-decoration: none; }
-  nav .brand img { width: 26px; height: 26px; }
-  nav .links { margin-left: auto; display: flex; gap: 22px; font-size: 14px; }
-  nav .links a { color: var(--muted); text-decoration: none; }
-  nav .links a:hover { color: var(--text); }
-  nav .lang { cursor: pointer; border: 1px solid var(--card-border); border-radius: 999px; padding: 3px 12px; background: none; color: var(--muted); font: inherit; font-size: 13px; }
-
-  header.hero { text-align: center; padding: 88px 0 40px; }
-  .hero img.icon { width: 148px; height: 148px; filter: drop-shadow(0 24px 48px rgba(59, 108, 246, 0.45)); }
-  .hero h1 { font-size: clamp(40px, 7vw, 68px); letter-spacing: -0.03em; margin: 18px 0 8px; line-height: 1.05; }
-  .hero h1 span {
-    background: linear-gradient(120deg, #8fb0ff, #3b6cf6 45%, #7c4ddb);
-    -webkit-background-clip: text; background-clip: text; color: transparent;
-  }
-  .hero p.lead { font-size: clamp(17px, 2.2vw, 21px); color: var(--muted); max-width: 720px; margin: 0 auto; }
-  .downloads { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; margin: 36px 0 14px; }
-  .btn {
-    display: inline-flex; align-items: center; gap: 10px; text-align: left;
-    padding: 13px 22px; border-radius: 14px; text-decoration: none; font-weight: 600; font-size: 16px;
-    transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
-  }
-  .btn small { display: block; font-weight: 400; font-size: 12px; opacity: .75; }
-  .btn.primary { color: #fff; background: linear-gradient(135deg, var(--accent), var(--accent-2)); box-shadow: 0 10px 30px rgba(59, 108, 246, .35); }
-  .btn.secondary { background: var(--card); border: 1px solid var(--card-border); }
-  .btn:hover { transform: translateY(-2px); }
-  .btn svg { width: 22px; height: 22px; flex: none; }
-  .meta { color: var(--muted); font-size: 13px; }
-  .meta a { color: var(--muted); }
-
-  .shot { margin: 56px auto 0; max-width: 1000px; }
-  .shot img { width: 100%; display: block; border-radius: 14px; box-shadow: var(--shot-shadow); }
-  .shot p { color: var(--muted); font-size: 14px; max-width: 760px; margin: 18px auto 0; }
-
-  section { padding: 96px 0 0; }
-  section h2 { font-size: clamp(28px, 4vw, 40px); letter-spacing: -0.02em; margin: 0 0 8px; text-align: center; }
-  section p.sub { text-align: center; color: var(--muted); margin: 0 auto 44px; max-width: 640px; }
-
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
-  .card {
-    background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius);
-    padding: 20px; transition: border-color .15s ease, transform .15s ease;
-  }
-  .card:hover { border-color: rgba(59, 108, 246, .45); transform: translateY(-2px); }
-  .card .tile {
-    width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center;
-    font-size: 19px; color: #fff; margin-bottom: 12px;
-  }
-  .card h3 { margin: 0 0 4px; font-size: 17px; }
-  .card p { margin: 0; color: var(--muted); font-size: 14px; }
-
-  .points { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
-  .point { padding: 24px; border-radius: var(--radius); background: var(--card); border: 1px solid var(--card-border); }
-  .point b { display: block; font-size: 18px; margin-bottom: 6px; }
-  .point span { color: var(--muted); font-size: 14px; }
-
-  pre.block {
-    max-width: 720px; margin: 0 auto 20px; padding: 18px 20px; border-radius: 14px; overflow-x: auto;
-    background: var(--card); border: 1px solid var(--card-border); font: 14px/1.7 var(--mono); color: var(--muted);
-  }
-  pre.block b { color: var(--text); font-weight: 600; }
-
-  .install ol { counter-reset: step; list-style: none; padding: 0; margin: 0 auto; max-width: 720px; }
-  .install li { counter-increment: step; position: relative; padding: 18px 20px 18px 64px; margin-bottom: 10px; background: var(--card); border: 1px solid var(--card-border); border-radius: 14px; }
-  .install li::before {
-    content: counter(step); position: absolute; left: 18px; top: 16px; width: 30px; height: 30px; border-radius: 50%;
-    display: grid; place-items: center; font-weight: 700; background: var(--step-bg); color: var(--step-text);
-  }
-  code { background: var(--code-bg); border-radius: 6px; padding: 1px 6px; font-size: 13px; font-family: var(--mono); }
-
-  footer { margin-top: 110px; padding: 36px 0 48px; border-top: 1px solid var(--card-border); color: var(--muted); font-size: 13px; }
-  footer .wrap { display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; }
-  footer a { color: var(--muted); }
-
-  [data-lang="en"] .zh, [data-lang="zh"] .en { display: none !important; }
-
-  @media (max-width: 640px) {
-    nav .links a.hide-sm { display: none; }
-    header.hero { padding-top: 56px; }
-  }
-</style>
+})();
+</script>
+<link rel="stylesheet" href="assets/site.css">
 </head>
-<body data-lang="zh">
+<body>
+<a class="skip" href="#main" data-i18n="a11y.skip">跳到正文</a>
 
-<nav>
-  <div class="wrap">
-    <a class="brand" href="#"><img src="assets/icon-256.png" alt="">HostsEditor</a>
-    <div class="links">
-      <a class="hide-sm" href="#features"><span class="zh">功能</span><span class="en">Features</span></a>
-      <a class="hide-sm" href="#install"><span class="zh">安装</span><span class="en">Install</span></a>
-      <a href="https://github.com/wangwanjie/HostsEditor/releases"><span class="zh">版本历史</span><span class="en">Releases</span></a>
-      <a href="https://github.com/wangwanjie/HostsEditor">GitHub</a>
-    </div>
-    <button class="lang" id="lang-toggle" type="button">EN</button>
-  </div>
-</nav>
-
-<header class="hero">
-  <div class="wrap">
-    <img class="icon" src="assets/icon.png" alt="HostsEditor">
-    <h1><span>HostsEditor</span></h1>
-    <p class="lead">
-      <span class="zh">macOS 上的 Hosts 文件编辑与方案切换工具。在多套 hosts 配置之间稳定切换，通过特权 Helper 安全写回 <code>/etc/hosts</code>。</span>
-      <span class="en">A hosts file editor and profile switcher for macOS. Switch between multiple hosts setups reliably, and write <code>/etc/hosts</code> safely through a privileged helper.</span>
-    </p>
-    <div class="downloads">
-      <!-- 安装包文件名带版本号，默认指向最新 Release 页，页面加载后再替换为实际下载地址 -->
-      <a class="btn primary" id="dl-arm" href="https://github.com/wangwanjie/HostsEditor/releases/latest">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0-5-5m5 5 5-5M5 21h14"/></svg>
-        <span><span class="zh">下载 Apple 芯片版</span><span class="en">Download for Apple silicon</span><small>M1 / M2 / M3 / M4 …</small></span>
+<header class="top" id="top">
+  <div class="wrap top-in">
+    <a class="brand" href="#top" data-i18n-aria="a11y.home" aria-label="HostsEditor 首页">
+      <img src="assets/icon-64.webp" width="32" height="32" alt="" decoding="async">
+      <span>HostsEditor</span>
+    </a>
+    <nav class="nav" data-i18n-aria="a11y.nav" aria-label="页面导航">
+      <a href="#features" data-i18n="nav.features">功能</a>
+      <a href="#how" data-i18n="nav.how">工作方式</a>
+      <a href="#keys" data-i18n="nav.keys">快捷键</a>
+      <a href="#faq" data-i18n="nav.faq">常见问题</a>
+      <a href="#download" data-i18n="nav.download">下载</a>
+    </nav>
+    <div class="tools">
+      <div class="seg" role="group" id="langSeg" data-i18n-aria="a11y.lang" aria-label="切换语言">
+        <button type="button" data-lang="zh-Hans" lang="zh-CN">简</button>
+        <button type="button" data-lang="en" lang="en">EN</button>
+        <button type="button" data-lang="zh-Hant" lang="zh-TW">繁</button>
+      </div>
+      <div class="seg" role="group" id="themeSeg" data-i18n-aria="a11y.theme" aria-label="主题">
+        <button type="button" data-theme-btn="light" data-i18n-aria="theme.light" aria-label="浅色" data-i18n-title="theme.light" title="浅色">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="3"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.4 1.4M11.6 11.6 13 13M3 13l1.4-1.4M11.6 4.4 13 3"/></svg>
+        </button>
+        <button type="button" data-theme-btn="dark" data-i18n-aria="theme.dark" aria-label="深色" data-i18n-title="theme.dark" title="深色">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 9.6A5.5 5.5 0 0 1 6.4 2.5a5.5 5.5 0 1 0 7.1 7.1z"/></svg>
+        </button>
+        <button type="button" data-theme-btn="system" data-i18n-aria="theme.system" aria-label="跟随系统" data-i18n-title="theme.system" title="跟随系统">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="9" rx="1.5"/><path d="M5.5 14h5M8 11.5V14"/></svg>
+        </button>
+      </div>
+      <a class="gh" href="https://github.com/wangwanjie/HostsEditor" data-i18n-aria="a11y.github" aria-label="GitHub 仓库" data-i18n-title="a11y.github" title="GitHub 仓库" rel="noopener">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
       </a>
-      <a class="btn secondary" id="dl-intel" href="https://github.com/wangwanjie/HostsEditor/releases/latest">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0-5-5m5 5 5-5M5 21h14"/></svg>
-        <span><span class="zh">下载 Intel 版</span><span class="en">Download for Intel</span><small>x86_64</small></span>
-      </a>
-    </div>
-    <div class="meta">
-      <span class="zh">免费 · macOS 13.0 及以上 · 已通过 Apple 公证 · 内置自动更新</span>
-      <span class="en">Free · macOS 13.0 or later · Notarized by Apple · Built-in auto update</span>
-      <span id="version"></span>
-    </div>
-
-    <div class="shot">
-      <img src="assets/screenshots/home.png" alt="HostsEditor">
-      <p>
-        <span class="zh">左侧是方案列表：「系统」为当前 /etc/hosts 全文，「默认」为剥离 HostsEditor 管理块后的基础内容，下方是本地方案与远程方案，勾选即启用；右侧是带语法高亮的编辑器。</span>
-        <span class="en">Profiles on the left: “System” is the full /etc/hosts, “Default” is the base content without HostsEditor blocks, followed by local and remote profiles — tick to enable. On the right, an editor with syntax highlighting.</span>
-      </p>
     </div>
   </div>
 </header>
 
-<section>
-  <div class="wrap">
-    <div class="points">
-      <div class="point"><b><span class="zh">只改自己的部分</span><span class="en">Touches only its own blocks</span></b><span class="zh">保留系统 hosts 中不属于 HostsEditor 管理块的内容，写入前重新读取，不覆盖其他工具的修改。</span><span class="en">Content outside HostsEditor blocks is kept, and the file is re-read before writing so other tools’ changes survive.</span></div>
-      <div class="point"><b><span class="zh">立即生效</span><span class="en">Takes effect immediately</span></b><span class="zh">写入后自动刷新 DNS 缓存，切换方案无需手动操作。</span><span class="en">The DNS cache is flushed after every write, so switching profiles needs no extra steps.</span></div>
-      <div class="point"><b><span class="zh">权限分离</span><span class="en">Privilege separation</span></b><span class="zh">主应用不以 root 运行，写入 /etc/hosts 由经 XPC 调用的特权 Helper 完成。</span><span class="en">The app never runs as root; writes go through a privileged helper over XPC.</span></div>
-      <div class="point"><b><span class="zh">三种语言</span><span class="en">Three languages</span></b><span class="zh">简体中文、繁體中文、English，支持浅色和深色外观。</span><span class="en">Simplified Chinese, Traditional Chinese and English, in light and dark appearance.</span></div>
+<main id="main">
+  <!-- 首屏：文案 + 会自己打字的 hosts 编辑器 -->
+  <section class="hero" data-section="hero">
+    <div class="wrap hero-in">
+      <div class="hero-copy">
+        <p class="eyebrow mono"><span class="c-cm" data-i18n="hero.eyebrow"># macOS 上的 hosts 编辑与方案切换工具</span></p>
+        <h1 class="hero-title" data-i18n-html="hero.title">勾选方案，<span class="grad">hosts 即刻切换</span></h1>
+        <p class="lead" data-i18n-html="hero.lead">为开发、测试、预发、线上环境各存一套 hosts。勾选即启用，多个方案组合后经特权 Helper 写回 <code>/etc/hosts</code>，写入后自动刷新 DNS 缓存。</p>
+        <div class="cta">
+          <a class="btn btn-pri" data-dl="arm64" href="https://github.com/wangwanjie/HostsEditor/releases/latest">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v8M4.5 6.5 8 10l3.5-3.5M2.5 13.5h11"/></svg>
+            <span><b data-i18n="dl.arm">Apple 芯片版</b><small class="mono" data-dl-meta="arm64">arm64 · DMG</small></span>
+          </a>
+          <a class="btn btn-sec" data-dl="x86_64" href="https://github.com/wangwanjie/HostsEditor/releases/latest">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v8M4.5 6.5 8 10l3.5-3.5M2.5 13.5h11"/></svg>
+            <span><b data-i18n="dl.intel">Intel 版</b><small class="mono" data-dl-meta="x86_64">x86_64 · DMG</small></span>
+          </a>
+        </div>
+        <p class="req mono"><span class="ver" data-ver>latest</span> · <span data-i18n="hero.req">macOS 13.0+ · Apple 公证 · Sparkle 自动更新</span></p>
+      </div>
+
+      <div class="hero-demo">
+        <div class="ide" id="demo">
+          <div class="ide-bar">
+            <span class="lights" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="ide-title mono" id="demoTitle">/etc/hosts</span>
+            <span class="ide-badge mono" id="demoBadge" aria-live="polite"></span>
+          </div>
+          <div class="ide-body">
+            <aside class="side" id="demoSide" data-i18n-aria="demo.sidebar" aria-label="方案列表">
+              <button type="button" class="row sys is-sel" data-view="system"><span class="ico" aria-hidden="true">⌘</span><span data-i18n="demo.system">系统</span></button>
+              <button type="button" class="row sys" data-view="default"><span class="ico" aria-hidden="true">◇</span><span data-i18n="demo.default">默认</span></button>
+              <p class="side-h mono" data-i18n="demo.local">本地配置</p>
+              <div id="demoLocal"></div>
+              <p class="side-h mono" data-i18n="demo.remote">远程配置</p>
+              <div id="demoRemote"></div>
+            </aside>
+            <div class="code-wrap">
+              <div class="code mono" id="demoCode" aria-live="off"></div>
+            </div>
+          </div>
+          <div class="ide-status mono">
+            <span id="demoState"></span>
+            <span class="toast" id="demoToast" role="status"></span>
+            <span class="st-r">UTF-8 · LF</span>
+          </div>
+        </div>
+        <p class="demo-hint mono" data-i18n="demo.hint">↑ 勾选左侧方案，/etc/hosts 实时变化；点名称查看单个方案</p>
+      </div>
     </div>
-  </div>
-</section>
+  </section>
 
-<section id="features">
-  <div class="wrap">
-    <h2><span class="zh">功能</span><span class="en">Features</span></h2>
-    <p class="sub"><span class="zh">本地开发切换环境、团队分发共享配置、菜单栏一键开关，都在一个原生 App 里。</span><span class="en">Switch dev environments, share team configs by URL and toggle profiles from the menu bar — in one native app.</span></p>
-    <div class="grid" id="feature-grid"></div>
-  </div>
-</section>
+  <!-- 功能 -->
+  <section class="sec" id="features" data-section="features">
+    <div class="wrap">
+      <header class="sec-h reveal">
+        <p class="eyebrow mono"><span class="ln">02</span><span class="c-kw">##</span> <span data-i18n="features.k">features</span></p>
+        <h2 data-i18n="features.title">把 hosts 当成一组可开关的方案来管理</h2>
+        <p class="sub" data-i18n="features.sub">每一项都来自应用的实际功能。</p>
+      </header>
+      <div class="grid feats">
+        <article class="card reveal"><p class="flag mono">--profiles</p><h3 data-i18n="f1.t">多方案管理</h3><p data-i18n="f1.d">创建多套本地 hosts 方案，按需启用、停用、复制或删除；多个启用方案组合后一起写入。</p></article>
+        <article class="card reveal"><p class="flag mono">--apply</p><h3 data-i18n="f2.t">系统级应用</h3><p data-i18n="f2.d">组合内容写入系统 /etc/hosts，写入后自动刷新 DNS 缓存，修改立即生效。</p></article>
+        <article class="card reveal"><p class="flag mono">--remote &lt;url&gt;</p><h3 data-i18n="f3.t">远程方案</h3><p data-i18n="f3.d">从 http / https 地址拉取 hosts 保存为方案，可手动刷新，也可每小时、每 6 小时或每天自动刷新。</p></article>
+        <article class="card reveal"><p class="flag mono">--backup 30</p><h3 data-i18n="f4.t">自动备份</h3><p data-i18n="f4.d">每次写入前备份旧内容，保留最近 30 份，可从「文件」菜单在访达中查看。</p></article>
+        <article class="card reveal"><p class="flag mono">--menubar</p><h3 data-i18n="f5.t">菜单栏快速切换</h3><p data-i18n="f5.d">状态栏图标列出全部方案，点一下即可启用或关闭，不必打开主窗口。</p></article>
+        <article class="card reveal"><p class="flag mono">--highlight</p><h3 data-i18n="f6.t">为 hosts 定制的编辑器</h3><p data-i18n="f6.d">注释、IP（含 IPv6）、主机名语法高亮，查找替换、⌘/ 批量注释，支持浅色和深色外观。</p></article>
+        <article class="card reveal"><p class="flag mono">--import / --export</p><h3 data-i18n="f7.t">导入与导出</h3><p data-i18n="f7.d">把本地 hosts 文件导入为方案，或把当前内容导出为文本文件。</p></article>
+        <article class="card reveal"><p class="flag mono">--keep-original</p><h3 data-i18n="f8.t">保留原始内容</h3><p data-i18n="f8.d">只改写自己的管理块；写入前重新读取系统 hosts，不覆盖其他工具的修改。</p></article>
+        <article class="card reveal"><p class="flag mono">--safe</p><h3 data-i18n="f9.t">防误操作</h3><p data-i18n="f9.d">有未保存的修改时窗口关闭按钮显示提示点，退出前二次确认。</p></article>
+      </div>
+      <p class="also mono reveal"><span class="c-cm" data-i18n="features.also"># 另有：简体中文 / 繁體中文 / English 界面；Sparkle 按芯片架构分别推送更新</span></p>
+    </div>
+  </section>
 
-<section id="how">
-  <div class="wrap">
-    <h2><span class="zh">工作方式</span><span class="en">How it works</span></h2>
-    <p class="sub"><span class="zh">应用管理的内容写成带标记的块，多个启用方案可以组合写入，原始基础内容保持不变。</span><span class="en">Managed content is written as marked blocks, so several enabled profiles combine while your original base content stays intact.</span></p>
-    <pre class="block">127.0.0.1        localhost
+  <!-- 工作方式 -->
+  <section class="sec" id="how" data-section="how">
+    <div class="wrap">
+      <header class="sec-h reveal">
+        <p class="eyebrow mono"><span class="ln">03</span><span class="c-kw">##</span> <span data-i18n="how.k">how-it-works</span></p>
+        <h2 data-i18n="how.title">只改写自己管理的那几段</h2>
+        <p class="sub" data-i18n="how.sub">每个启用的方案写成一个带标记的块，块外的内容原样保留。</p>
+      </header>
+      <div class="how-grid">
+        <div class="panel reveal">
+          <div class="panel-h mono">/etc/hosts</div>
+          <pre class="snippet mono" id="howSnippet"></pre>
+          <dl class="terms">
+            <div><dt class="mono" data-i18n="term.system.k">系统</dt><dd data-i18n="term.system.v">当前 /etc/hosts 的完整内容，可直接编辑并保存。</dd></div>
+            <div><dt class="mono" data-i18n="term.default.k">默认</dt><dd data-i18n="term.default.v">剥离 HostsEditor 管理块后的基础内容，只读查看。</dd></div>
+            <div><dt class="mono" data-i18n="term.local.k">本地配置</dt><dd data-i18n="term.local.v">手动维护的方案，可编辑、启用、删除。</dd></div>
+            <div><dt class="mono" data-i18n="term.remote.k">远程配置</dt><dd data-i18n="term.remote.v">从 URL 拉取的方案，支持刷新。</dd></div>
+          </dl>
+        </div>
+        <div class="panel term reveal" id="howTerm">
+          <div class="panel-h mono"><span data-i18n="how.term">写入流程（示意）</span></div>
+          <ol class="log mono" id="howLog">
+            <li><span class="tag">app</span><span data-i18n="log.1">重新读取 /etc/hosts，保留外部改动</span></li>
+            <li><span class="tag">app</span><span data-i18n="log.2">组合基础内容与已启用方案</span></li>
+            <li><span class="tag">app</span><span data-i18n="log.3">备份旧内容（保留最近 30 份）</span></li>
+            <li><span class="tag xpc">xpc</span><span>→ cn.vanjay.HostsEditorHelper</span></li>
+            <li><span class="tag root">root</span><span data-i18n="log.5">Helper 写入 /etc/hosts</span></li>
+            <li><span class="tag root">root</span><span>dscacheutil -flushcache</span></li>
+            <li><span class="tag root">root</span><span>killall -HUP mDNSResponder</span></li>
+            <li><span class="tag">app</span><span data-i18n="log.8">回读校验写入结果</span></li>
+            <li class="ok"><span class="tag ok">done</span><span data-i18n="log.9">已生效</span></li>
+          </ol>
+          <ul class="sec-notes">
+            <li data-i18n="sec.1">主应用负责界面、方案管理、状态栏和远程拉取，本身不以 root 运行。</li>
+            <li data-i18n="sec.2">Helper 通过 SMAppService 注册为后台守护进程，主应用经 XPC 与它通信。</li>
+            <li data-i18n="sec.3">首次安装或重新注册 Helper 时需要系统授权。</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
 
-<b># HostsEditor:BEGIN:&lt;profile-id&gt;</b>
-127.0.0.1        api.example.dev
-<b># HostsEditor:END:&lt;profile-id&gt;</b></pre>
-  </div>
-</section>
+  <!-- 真实界面 -->
+  <section class="sec" id="shot" data-section="screenshot">
+    <div class="wrap">
+      <header class="sec-h reveal">
+        <p class="eyebrow mono"><span class="ln">04</span><span class="c-kw">##</span> <span data-i18n="shot.k">screenshot</span></p>
+        <h2 data-i18n="shot.title">应用里的样子</h2>
+        <p class="sub" data-i18n="shot.sub">左侧是方案列表，勾选即启用；右侧是带语法高亮的编辑器。</p>
+      </header>
+      <figure class="shot reveal">
+        <img src="assets/screenshots/home.webp" srcset="assets/screenshots/home-800.webp 800w, assets/screenshots/home.webp 1600w" sizes="(max-width: 1120px) 94vw, 1040px" width="1600" height="1095" loading="lazy" decoding="async" alt="HostsEditor 主界面：左侧方案列表，右侧语法高亮的 hosts 编辑器" data-i18n-alt="shot.alt">
+      </figure>
+    </div>
+  </section>
 
-<section id="install" class="install">
-  <div class="wrap">
-    <h2><span class="zh">安装</span><span class="en">Install</span></h2>
-    <p class="sub"><span class="zh">不确定芯片类型？打开「苹果菜单 › 关于本机」，看“芯片”或“处理器”一栏。</span><span class="en">Not sure which chip you have? Open  › About This Mac and check “Chip” or “Processor”.</span></p>
-    <ol>
-      <li><span class="zh">下载与本机芯片匹配的 DMG，打开后把 HostsEditor 拖进「应用程序」文件夹。</span><span class="en">Download the DMG for your chip, open it and drag HostsEditor into Applications.</span></li>
-      <li><span class="zh">打开 HostsEditor。首次读取或写入系统 hosts 时，应用会注册特权 Helper，按系统提示输入管理员密码。</span><span class="en">Launch HostsEditor. The first time it reads or writes the system hosts file it registers a privileged helper; enter your administrator password when asked.</span></li>
-      <li><span class="zh">如果出现“需要允许后台程序”，前往「系统设置 › 通用 › 登录项与扩展程序」允许 HostsEditor 的后台程序，然后重新打开应用。</span><span class="en">If macOS asks to allow a background item, go to System Settings › General › Login Items &amp; Extensions, allow HostsEditor, then reopen the app.</span></li>
-      <li><span class="zh">点击左下角「新建」创建本地方案或远程方案，勾选即启用，<code>⌘S</code> 保存并应用。</span><span class="en">Click “New” to create a local or remote profile, tick it to enable, and press <code>⌘S</code> to save and apply.</span></li>
-    </ol>
-  </div>
-</section>
+  <!-- 快捷键 -->
+  <section class="sec" id="keys" data-section="shortcuts">
+    <div class="wrap">
+      <header class="sec-h reveal">
+        <p class="eyebrow mono"><span class="ln">05</span><span class="c-kw">##</span> <span data-i18n="keys.k">keybindings</span></p>
+        <h2 data-i18n="keys.title">常用快捷键</h2>
+      </header>
+      <div class="keys reveal">
+        <div class="key-row"><span class="kc"><kbd>⌘</kbd><kbd>N</kbd><i>/</i><kbd>⇧</kbd><kbd>⌘</kbd><kbd>N</kbd></span><span data-i18n="k1">新建本地方案 / 新建远程方案</span></div>
+        <div class="key-row"><span class="kc"><kbd>⌘</kbd><kbd>O</kbd></span><span data-i18n="k2">导入 hosts 文件为本地方案</span></div>
+        <div class="key-row"><span class="kc"><kbd>⌘</kbd><kbd>S</kbd></span><span data-i18n="k3">保存并应用</span></div>
+        <div class="key-row"><span class="kc"><kbd>⇧</kbd><kbd>⌘</kbd><kbd>S</kbd></span><span data-i18n="k4">导出当前内容</span></div>
+        <div class="key-row"><span class="kc"><kbd>⌘</kbd><kbd>F</kbd><i>/</i><kbd>⌘</kbd><kbd>R</kbd></span><span data-i18n="k5">查找 / 替换</span></div>
+        <div class="key-row"><span class="kc"><kbd>⌘</kbd><kbd>/</kbd></span><span data-i18n="k6">注释或取消注释选中行</span></div>
+        <div class="key-row"><span class="kc"><kbd>⌘</kbd><kbd>+</kbd><i>/</i><kbd>⌘</kbd><kbd>-</kbd></span><span data-i18n="k7">调整编辑器字号</span></div>
+      </div>
+    </div>
+  </section>
 
-<footer>
-  <div class="wrap">
-    <span>© 2026 VanJay · HostsEditor</span>
-    <span>
-      <a href="https://github.com/wangwanjie/HostsEditor/releases"><span class="zh">版本历史</span><span class="en">Releases</span></a> ·
-      <a href="https://github.com/wangwanjie/HostsEditor/issues"><span class="zh">反馈问题</span><span class="en">Feedback</span></a>
-    </span>
+  <!-- 首次使用与常见问题 -->
+  <section class="sec" id="faq" data-section="faq">
+    <div class="wrap">
+      <header class="sec-h reveal">
+        <p class="eyebrow mono"><span class="ln">06</span><span class="c-kw">##</span> <span data-i18n="faq.k">getting-started</span></p>
+        <h2 data-i18n="faq.title">首次使用与常见问题</h2>
+      </header>
+      <div class="faq-grid">
+        <ol class="steps reveal">
+          <li data-i18n="s1">下载与芯片匹配的 DMG，把 HostsEditor 拖进「应用程序」后打开。</li>
+          <li data-i18n="s2">首次读取或写入系统 hosts 时，应用会注册特权 Helper。</li>
+          <li data-i18n="s3">系统要求授权时，输入管理员密码。</li>
+          <li data-i18n="s4">若提示「需要允许后台程序」，前往「系统设置 › 通用 › 登录项与扩展程序」允许 HostsEditor 的后台程序，然后重新打开应用。</li>
+        </ol>
+        <div class="qa reveal">
+          <details open>
+            <summary data-i18n="q1.q">出现 “couldn’t communicate with a helper application”</summary>
+            <p data-i18n="q1.a1">通常是系统里残留了旧版本的后台任务记录。先退出 HostsEditor，再在终端清理旧记录：</p>
+            <div class="cmd">
+              <pre class="mono"><span class="c-fn">sudo</span> launchctl bootout system/cn.vanjay.HostsEditor.Helper <span class="c-op">2&gt;/dev/null</span> <span class="c-op">||</span> <span class="c-kw">true</span>
+<span class="c-fn">sudo</span> launchctl bootout system/cn.vanjay.HostsEditorHelper <span class="c-op">2&gt;/dev/null</span> <span class="c-op">||</span> <span class="c-kw">true</span></pre>
+              <button type="button" class="copy mono" data-copy="sudo launchctl bootout system/cn.vanjay.HostsEditor.Helper 2>/dev/null || true&#10;sudo launchctl bootout system/cn.vanjay.HostsEditorHelper 2>/dev/null || true" data-i18n="copy">复制</button>
+            </div>
+            <p data-i18n="q1.a2">确认 /Applications 与 ~/Applications 里只有一份 HostsEditor.app，重新打开应用，点一次「启用或修复后台帮助程序」，再触发一次系统 hosts 的读取或写入。</p>
+          </details>
+          <details>
+            <summary data-i18n="q2.q">提示「需要允许后台程序」</summary>
+            <p data-i18n="q2.a">前往「系统设置 › 通用 › 登录项与扩展程序」，允许 HostsEditor 的后台程序，然后重新启动应用。</p>
+          </details>
+          <details>
+            <summary data-i18n="q3.q">不确定自己的 Mac 是哪种芯片</summary>
+            <p data-i18n="q3.a">打开「苹果菜单 › 关于本机」，看「芯片」或「处理器」一栏：显示 Apple M 系列选 Apple 芯片版，显示 Intel 选 Intel 版。</p>
+          </details>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 下载 -->
+  <section class="sec dl" id="download" data-section="download">
+    <div class="wrap">
+      <div class="dl-box reveal">
+        <img src="assets/icon-128.webp" width="96" height="96" alt="HostsEditor 图标" data-i18n-alt="a11y.icon" loading="lazy" decoding="async">
+        <h2 data-i18n="dl.title">下载 HostsEditor</h2>
+        <p class="sub" data-i18n="dl.sub">需要 macOS 13.0 或更高版本。安装包已通过 Apple 公证，打开 DMG 后把应用拖进「应用程序」即可；内置 Sparkle 自动更新，只推送与本机芯片匹配的版本。</p>
+        <div class="cta center">
+          <a class="btn btn-pri" data-dl="arm64" href="https://github.com/wangwanjie/HostsEditor/releases/latest">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v8M4.5 6.5 8 10l3.5-3.5M2.5 13.5h11"/></svg>
+            <span><b data-i18n="dl.arm">Apple 芯片版</b><small class="mono" data-dl-meta="arm64">arm64 · DMG</small></span>
+          </a>
+          <a class="btn btn-sec" data-dl="x86_64" href="https://github.com/wangwanjie/HostsEditor/releases/latest">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v8M4.5 6.5 8 10l3.5-3.5M2.5 13.5h11"/></svg>
+            <span><b data-i18n="dl.intel">Intel 版</b><small class="mono" data-dl-meta="x86_64">x86_64 · DMG</small></span>
+          </a>
+        </div>
+        <p class="req mono"><a href="https://github.com/wangwanjie/HostsEditor/releases" data-i18n="dl.all">全部版本与更新说明 →</a></p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="wrap foot-in">
+    <div class="foot-brand">
+      <img src="assets/icon-64.webp" width="28" height="28" alt="" loading="lazy" decoding="async">
+      <span>HostsEditor</span>
+    </div>
+    <nav class="foot-links" data-i18n-aria="a11y.footer" aria-label="页脚链接">
+      <a href="https://vanjay.cn" data-i18n="foot.more">VanJay 的更多作品</a>
+      <a href="https://github.com/wangwanjie/HostsEditor" rel="noopener">GitHub</a>
+      <a href="https://github.com/wangwanjie/HostsEditor/issues" rel="noopener" data-i18n="foot.issues">反馈问题</a>
+    </nav>
+    <p class="copy-r mono">© 2026 VanJay</p>
   </div>
 </footer>
 
-<script>
-  // 功能卡片：[图标, 颜色, 中文名, 英文名, 中文说明, 英文说明]
-  const features = [
-    ["☰", "#3b6cf6", "多方案管理", "Multiple profiles", "创建多套本地 hosts 方案，按需启用、停用、复制或删除。", "Keep several local hosts profiles; enable, disable, duplicate or delete them as needed."],
-    ["⇪", "#7c4ddb", "系统级应用", "System-wide apply", "将启用中的方案组合后写入 /etc/hosts，写入后自动刷新 DNS 缓存，立即生效。", "Enabled profiles are combined into /etc/hosts and the DNS cache is flushed right away."],
-    ["☁", "#0ea5e9", "远程方案", "Remote profiles", "从 http / https 地址拉取 hosts 内容，支持手动刷新和按间隔自动刷新。", "Fetch hosts content from an http / https URL, refreshed manually or on a schedule."],
-    ["⇄", "#14b8a6", "导入导出", "Import & export", "把本地 hosts 文件导入为方案，也可把当前内容导出为文本文件。", "Import a hosts file as a profile, or export the current content as a text file."],
-    ["⟲", "#f59e0b", "自动备份", "Automatic backups", "每次写入前备份旧内容，保留最近 30 份，可从「文件」菜单在访达中查看。", "The previous file is backed up before each write; the latest 30 are kept and reachable from the File menu."],
-    ["◉", "#6366f1", "菜单栏切换", "Menu bar toggle", "通过状态栏图标快速启用或关闭方案。", "Enable or disable profiles straight from the menu bar icon."],
-    ["✎", "#ec4899", "编辑器", "Editor", "注释、IP（含 IPv6）、主机名语法高亮，查找替换、批量注释（⌘/）。", "Highlighting for comments, IPs (including IPv6) and hostnames; find & replace; toggle comments with ⌘/."],
-    ["✓", "#22c55e", "防误操作", "Safe editing", "有未保存修改时窗口关闭按钮显示提示点，退出前二次确认。", "Unsaved changes are marked on the close button and confirmed before quitting."],
-    ["↻", "#ef4444", "自动更新", "Auto update", "集成 Sparkle，按芯片架构分别推送更新。", "Built-in Sparkle updates, delivered per chip architecture."]
-  ];
+<div class="statusbar mono" aria-hidden="true">
+  <span class="sb-l"><span class="sb-brand">HostsEditor</span><span id="sbSec">index.html › hero</span></span>
+  <span class="sb-r"><span id="sbLn">Ln 1, Col 1</span><span>UTF-8</span><span>LF</span><span id="sbTheme">One Dark</span></span>
+</div>
 
-  const grid = document.getElementById("feature-grid");
-  for (const [glyph, color, zh, en, zhText, enText] of features) {
-    const card = document.createElement("div");
-    card.className = "card";
-    card.innerHTML =
-      `<div class="tile" style="background:${color}">${glyph}</div>` +
-      `<h3><span class="zh">${zh}</span><span class="en">${en}</span></h3>` +
-      `<p><span class="zh">${zhText}</span><span class="en">${enText}</span></p>`;
-    grid.appendChild(card);
-  }
-
-  // 语言：默认跟随浏览器，记住用户的选择
-  const toggle = document.getElementById("lang-toggle");
-  function applyLanguage(lang) {
-    document.body.dataset.lang = lang;
-    document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
-    toggle.textContent = lang === "zh" ? "EN" : "中文";
-    localStorage.setItem("hostseditor.lang", lang);
-  }
-  const saved = localStorage.getItem("hostseditor.lang");
-  applyLanguage(saved || (navigator.language.toLowerCase().startsWith("zh") ? "zh" : "en"));
-  toggle.addEventListener("click", () => applyLanguage(document.body.dataset.lang === "zh" ? "en" : "zh"));
-
-  // 尽量识别 Intel Mac（浏览器无法可靠区分时保持 Apple 芯片优先）
-  try {
-    const canvas = document.createElement("canvas");
-    const gl = canvas.getContext("webgl");
-    const info = gl && gl.getExtension("WEBGL_debug_renderer_info");
-    const renderer = info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : "";
-    if (/Intel|AMD|Radeon/i.test(renderer) && !/Apple/i.test(renderer)) {
-      document.getElementById("dl-intel").className = "btn primary";
-      document.getElementById("dl-arm").className = "btn secondary";
-      document.querySelector(".downloads").prepend(document.getElementById("dl-intel"));
-    }
-  } catch (error) {}
-
-  // 显示最新版本号，并把下载按钮换成对应架构安装包的直链
-  fetch("https://api.github.com/repos/wangwanjie/HostsEditor/releases/latest")
-    .then((response) => (response.ok ? response.json() : null))
-    .then((release) => {
-      if (!release || !release.tag_name) {
-        return;
-      }
-      document.getElementById("version").textContent = ` · ${release.tag_name}`;
-      for (const asset of release.assets || []) {
-        if (/_arm64\.dmg$/.test(asset.name)) {
-          document.getElementById("dl-arm").href = asset.browser_download_url;
-        } else if (/_x86_64\.dmg$/.test(asset.name)) {
-          document.getElementById("dl-intel").href = asset.browser_download_url;
-        }
-      }
-    })
-    .catch(() => {});
-</script>
+<script src="assets/site.js" defer></script>
 </body>
 </html>
